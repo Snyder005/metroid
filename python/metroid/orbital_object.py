@@ -7,7 +7,7 @@ import scipy
 
 import rubin_sim.phot_utils as photUtils
 
-__all__ = ["DiskOrbitalObject", "RectangularOrbitalObject"]
+__all__ = ["CircularOrbitalObject", "RectangularOrbitalObject"]
 
 class BaseOrbitalObject:
     """A base class that defines attributes and methods common to all orbital
@@ -347,7 +347,7 @@ class BaseOrbitalObject:
 
         return projected_profile
 
-class DiskOrbitalObject(BaseOrbitalObject):
+class CircularOrbitalObject(BaseOrbitalObject):
     """A circular disk orbital object.
 
     Parameters
@@ -461,7 +461,7 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         Orbital height.
     zenith_angle : `astropy.units.Quantity`
         Observed angle from telescope zenith.
-    components : `list` [`leosim.Component`]
+    components : `list` [`metroid.BaseComponent`]
         A list of components.
 
     Raises
@@ -479,7 +479,7 @@ class CompositeOrbitalObject(BaseOrbitalObject):
 
     @property
     def components(self):
-        """A list of components. (`list` [`leosim.Component`], 
+        """A list of components. (`list` [`metroid.BaseComponent`], 
         read-only).
         """
         return self._components        
@@ -491,4 +491,9 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         """
         # Check create_profile method for proper astropy unit conversion.
         component_profiles = [component.create_profile(self.distance) for component in self.components]
-        return galsim.Sum(*component_profiles)
+        profile = galsim.Sum(*component_profiles)
+
+        if self.nadir_pointing:
+            profile = self._projection(profile)
+
+        return profile
