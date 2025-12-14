@@ -1,7 +1,7 @@
 import astropy.units as u
 import galsim
 
-__all__ = ["Panel", "Bus", "Dish"]
+__all__ = ["RectangularComponent", "CircularComponent"]
 
 class BaseComponent:
     """A class representing an orbital object component.
@@ -56,158 +56,115 @@ class RectangularComponent(BaseComponent):
     Parameters
     ----------
     x0 : `astropy.units.Quantity`
-        Component centroid position in x-direction.
+        Centroid position of the component in the x-direction.
     y0 : `astropy.units.Quantity`
-        Component centroid position in y-direction.
+        Centroid position of the component in the y-direction.
     width : `astropy.units.Quantity`
-        Width of the solar panel.
+        Width of the component.
     length : `astropy.units.Quantity`
-        Length of the solar panel.
+        Length of the component.
     reflectivity : `float`
-        Component reflectivity.
+        Reflectivity of the component.
     """
         
     def __init__(self, x0, y0, width, length, reflectivity):
         super().__init__(x0, y0, reflectivity)
-        
         self._width = width.to(u.m)
         self._length = length.to(u.m)
 
     @property
     def width(self):
-        """Width of the solar panel (`astropy.units.Quantity`, read-only)."""
-        return self._width
-
-    @property
-    def length(self):
-        """Length of the solar panel (`astropy.units.Quantity`, read-only)."""
-        return self._length        
-
-    def create_profile(self, distance):
-        """Create solar panel profile.
-    
-        Parameters
-        ----------
-        distance : `astropy.units.Quantity`
-            Distance to the satellite.
-
-        Returns
-        -------
-        profile : `galsim.GSObject`
-            Solar panel profile.
+        """Width of the component (`astropy.units.Quantity`, read-only).
         """
-        w = (self.width/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        l = (self.length/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = galsim.Box(w, l)
-        profile = profile.withFlux(self.flux)
-        
-        dx = (self.x0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        dy = (self.y0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = profile.shift(dx, dy)
-        
-        return profile
-    
-class Bus(Component):
-    """A class representing a satellite bus.
-
-    Parameters
-    ----------
-    x0 : `astropy.units.Quantity`
-        Component centroid position in x-direction.
-    y0 : `astropy.units.Quantity`
-        Component centroid position in y-direction.
-    width : `astropy.units.Quantity`
-        Width of the bus.
-    length : `astropy.units.Quantity`
-        Length of the bus.
-    flux : `float`, optional
-        Total flux of component in electrons (1.0, by default).
-    """
-        
-    def __init__(self, x0, y0, width, length, flux=1.0):
-        super().__init__(x0, y0, flux=flux)
-        
-        self._width = width.to(u.m)
-        self._length = length.to(u.m)
-
-    @property
-    def width(self):
-        """Width of the bus (`astropy.units.Quantity`, read-only)."""
         return self._width
 
     @property
     def length(self):
-        """Length of the bus (`astropy.units.Quantity`, read-only)."""
+        """Length of the component (`astropy.units.Quantity`, read-only).
+        """
         return self._length
-        
-    def create_profile(self, distance):
-        """Create bus profile.
+
+    @property
+    def area(self):
+        """Area of the component (`astropy.units.Quantity`, read-only).
+        """
+        area = self.width*self.height
+        return area
+
+    def create_profile(self, distance, flux=None):
+        """Create the component surface brightness profile.
     
         Parameters
         ----------
         distance : `astropy.units.Quantity`
-            Distance to the satellite.
+            Distance to the composite orbital object.
 
         Returns
         -------
         profile : `galsim.GSObject`
-            Bus profile.
+            Component surface brightness profile.
         """
         w = (self.width/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         l = (self.length/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.Box(w, l)
-        profile = profile.withFlux(self.flux)
-        
-        dx = (self.x0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        dy = (self.y0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = profile.shift(dx, dy)
-        
+        profile = self._shift(profile, distance)
+
+         if flux is not None:
+            profile.withFlux(flux)
+      
         return profile
-    
-class Dish(Component):
-    """A class representing a satellite dish.
+       
+class Circular(BaseComponent):
+    """A class representing a circular component.
 
     Parameters
     ----------
     x0 : `astropy.units.Quantity`
-        Component centroid position in x-direction.
+        Centroid position of the component in the x-direction.
     y0 : `astropy.units.Quantity`
-        Component centroid position in y-direction.
+        Centroid position of the component in the y-direction.
     radius : `astropy.units.Quantity`
-        Radius of the dish.
-    flux : `float`, optional
-        Total flux of component in electrons (1.0, by default).
-    """
+        Radius of the component.
+     reflectivity : `float`
+        Reflectivity of the component.
+   """
     
     def __init__(self, x0, y0, radius, flux=1.0):
         super().__init__(x0, y0, flux=flux)
-        
         self._radius = radius
 
     @property
     def radius(self):
         """Radius of the dish (`astropy.units.Quantity`, read-only)."""
         return self._radius
-        
-    def create_profile(self, distance):
-        """Create dish profile.
+ 
+    @property
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        area = np.pi*np.square(self.radius)
+        return area
+       
+    def create_profile(self, distance, flux=None):
+        """Create the component surface brightness profile.
     
         Parameters
         ----------
         distance : `astropy.units.Quantity`
-            Distance to the satellite.
+            Distance to the composite orbital object.
+        flux: `float`, optional
+            Number of adu. (None, by default).
 
         Returns
         -------
         profile : `galsim.GSObject`
-            Dish profile.
+            Component surface brightness profile.
         """
         r = (self.radius/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.TopHat(r)
-        profile = profile.withFlux(self.flux)
-        
-        dx = (self.x0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        dy = (self.y0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = profile.shift(dx, dy)
-        
+        profile = self._shift(profile, distance)
+
+        if flux is not None:
+            profile.withFlux(flux)
+       
         return profile
