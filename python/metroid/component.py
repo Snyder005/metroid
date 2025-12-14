@@ -3,8 +3,8 @@ import galsim
 
 __all__ = ["Panel", "Bus", "Dish"]
 
-class Component:
-    """A class representing a satellite component.
+class BaseComponent:
+    """A class representing an orbital object component.
 
     Parameters
     ----------
@@ -13,17 +13,13 @@ class Component:
     y0 : `astropy.units.Quantity`
         Component centroid position in y-direction.
     reflectivity : `float`
-        Reflectivity of the component.
+        Component reflectivity.
     """
-
-    area = None
-    """Surface area of the component (`float`).
-    """
-    
-    def __init__(self, x0, y0, flux=1.0):        
+   
+    def __init__(self, x0, y0, reflectivity):        
         self._x0 = x0.to(u.m)
         self._y0 = y0.to(u.m)
-        self.flux = flux
+        self.reflectivity = reflectivity
 
     @property
     def x0(self):
@@ -38,9 +34,24 @@ class Component:
         (`astropy.units.Quantity`, read-only).
         """
         return self._y0
+
+    @property
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        return None
+
+    def _shift(self, profile, distance):
+        """Shift component profile to centroid position.
+        """
+        dx = (self.x0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        dy = (self.y0/distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        profile = profile.shift(dx, dy)
+
+        return profile
         
-class Panel(Component):
-    """A class representing a satellite solar panel.
+class RectangularComponent(BaseComponent):
+    """A class representing a rectangular component.
 
     Parameters
     ----------
@@ -52,12 +63,12 @@ class Panel(Component):
         Width of the solar panel.
     length : `astropy.units.Quantity`
         Length of the solar panel.
-    flux : `float`, optional
-        Total flux of component in electrons (1.0, by default).
+    reflectivity : `float`
+        Component reflectivity.
     """
         
-    def __init__(self, x0, y0, width, length, flux=1.0):
-        super().__init__(x0, y0, flux=flux)
+    def __init__(self, x0, y0, width, length, reflectivity):
+        super().__init__(x0, y0, reflectivity)
         
         self._width = width.to(u.m)
         self._length = length.to(u.m)
