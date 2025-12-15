@@ -41,6 +41,13 @@ class BaseComponent:
         """
         return None
 
+    @property
+    def flux_scale(self):
+        """Flux scale factor (`float`).
+        """
+        flux_scale = (self.area*self.reflectivity).to_value(u.m*u.m)
+        return flux_scale
+
     def _shift(self, profile, distance):
         """Shift component profile to centroid position.
         """
@@ -98,6 +105,8 @@ class RectangularComponent(BaseComponent):
         ----------
         distance : `astropy.units.Quantity`
             Distance to the composite orbital object.
+        flux : `float`, optional
+            Number of adu (None, by default).
 
         Returns
         -------
@@ -109,9 +118,9 @@ class RectangularComponent(BaseComponent):
         profile = galsim.Box(w, l)
         profile = self._shift(profile, distance)
 
-        flux = (self.reflectivity*self.area).to_value(u.m*u.m)
-        if flux is not None:
-            profile = profile.withFlux(flux)
+        if flux is None:
+            flux = self.flux_scale
+        profile = profile.withFlux(flux)
       
         return profile
        
@@ -130,9 +139,9 @@ class Circular(BaseComponent):
         Reflectivity of the component.
    """
     
-    def __init__(self, x0, y0, radius, flux=1.0):
-        super().__init__(x0, y0, flux=flux)
-        self._radius = radius
+    def __init__(self, x0, y0, radius, reflectivity):
+        super().__init__(x0, y0, reflectivity)
+        self._radius = radius.to(u.m)
 
     @property
     def radius(self):
@@ -145,7 +154,7 @@ class Circular(BaseComponent):
         """
         area = np.pi*np.square(self.radius)
         return area
-       
+  
     def create_profile(self, distance, flux=None):
         """Create the component surface brightness profile.
     
@@ -165,8 +174,8 @@ class Circular(BaseComponent):
         profile = galsim.TopHat(r)
         profile = self._shift(profile, distance)
 
-        flux = self.reflectivity*self.area
-        if flux is not None:
-            profile.withFlux(flux)
+        if flux is None:
+            flux = self.flux_scale
+        profile = profile.withFlux(flux)
        
         return profile

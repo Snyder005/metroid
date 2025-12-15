@@ -327,7 +327,7 @@ class BaseOrbitalObject:
 
         return glint_image
 
-    def _projection(self, profile):
+    def _project(self, profile):
         """Apply angle-of-view projection effects.
 
         Parameters
@@ -343,9 +343,9 @@ class BaseOrbitalObject:
 
         mu = np.cos(self.nadir_angle)
         angle = galsim.Angle(self.phi.to_value(u.deg), galsim.degrees)
-        projected_profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
+        profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
 
-        return projected_profile
+        return profile
 
 class CircularOrbitalObject(BaseOrbitalObject):
     """A circular disk orbital object.
@@ -390,7 +390,7 @@ class CircularOrbitalObject(BaseOrbitalObject):
         profile = galsim.TopHat(r)
 
         if self.nadir_pointing:
-            profile = self._projection(profile)
+            profile = self._project(profile)
 
         return profile
 
@@ -447,7 +447,7 @@ class RectangularOrbitalObject(BaseOrbitalObject):
         profile = galsim.Box(w, l)
 
         if self.nadir_pointing:
-            profile = self._projection(profile)
+            profile = self._project(profile)
 
         return profile
 
@@ -500,6 +500,6 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         profile = galsim.Sum(*component_profiles)
 
         if self.nadir_pointing:
-            profile = self._projection(profile)
+            profile = self._project(profile)
 
         return profile
