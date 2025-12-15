@@ -88,7 +88,7 @@ class RectangularComponent(BaseComponent):
     def area(self):
         """Area of the component (`astropy.units.Quantity`, read-only).
         """
-        area = self.width*self.height
+        area = self.width*self.length
         return area
 
     def create_profile(self, distance, flux=None):
@@ -109,8 +109,9 @@ class RectangularComponent(BaseComponent):
         profile = galsim.Box(w, l)
         profile = self._shift(profile, distance)
 
-         if flux is not None:
-            profile.withFlux(flux)
+        flux = (self.reflectivity*self.area).to_value(u.m*u.m)
+        if flux is not None:
+            profile = profile.withFlux(flux)
       
         return profile
        
@@ -164,6 +165,7 @@ class Circular(BaseComponent):
         profile = galsim.TopHat(r)
         profile = self._shift(profile, distance)
 
+        flux = self.reflectivity*self.area
         if flux is not None:
             profile.withFlux(flux)
        

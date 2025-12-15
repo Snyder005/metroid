@@ -29,7 +29,7 @@ class BaseOrbitalObject:
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, phi=90*u.deg, nadir_pointing=True):
@@ -368,7 +368,7 @@ class CircularOrbitalObject(BaseOrbitalObject):
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, radius, phi=90*u.deg, nadir_pointing=True): 
@@ -417,7 +417,7 @@ class RectangularOrbitalObject(BaseOrbitalObject):
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, width, length, phi=90*u.deg, nadir_pointing=True):
@@ -463,6 +463,8 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         Observed angle from telescope zenith.
     components : `list` [`metroid.BaseComponent`]
         A list of components.
+    phi : `astropy.units.Quantity`, optional
+        Angular orientation (90 degrees, by default)
 
     Raises
     ------
@@ -470,9 +472,12 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         Raised if ``components`` is of length 0.
     """
 
-    def __init__(self, height, zenith_angle, components):
-        super().__init__(height, zenith_angle)
+    nadir_pointing = None
+    """Nadir-pointing object if `True` (`bool`).
+    """
 
+    def __init__(self, height, zenith_angle, components, phi=90*u.deg, nadir_pointing=True):
+        super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
         if len(components) == 0: # Need a way to check this is a non-empty list or tuple (or similar).
             raise ValueError("components list must include at least one component.")
         self._components = components
@@ -489,6 +494,7 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         """Orbital object geometric surface brightness profile 
         (`galsim.GSObject`, read-only).
         """
+
         # Check create_profile method for proper astropy unit conversion.
         component_profiles = [component.create_profile(self.distance) for component in self.components]
         profile = galsim.Sum(*component_profiles)
