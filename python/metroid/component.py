@@ -93,7 +93,7 @@ class RectangularComponent(BaseComponent):
 
     @property
     def area(self):
-        """Area of the component (`astropy.units.Quantity`, read-only).
+        """Surface area (`astropy.units.Quantity`, read-only).
         """
         area = self.width*self.length
         return area
@@ -152,7 +152,7 @@ class Circular(BaseComponent):
     def area(self):
         """Surface area (`astropy.units.Quantity`, read-only).
         """
-        area = np.pi*np.square(self.radius)
+        area = np.pi*self.radius**2.
         return area
   
     def create_profile(self, distance, flux=None):

@@ -1,5 +1,3 @@
-__all__ = ("Observatory",)
-
 import os
 import astropy.units as u
 import numpy as np
@@ -81,6 +79,16 @@ class Observatory:
         return self._bandpasses
 
     @property
+    def throughputs(self):
+        throughputs = {}
+        for band, bandpass in self.bandpasses.items():
+            dlambda = bandpass.wavelen[1]-bandpass.wavelen[0]
+            throughput = np.sum(bandpass.sb*dlambda/bandpass.wavelen)
+            throughputs[band] = throughput
+    
+        return throughputs
+
+    @property
     def effective_area(self):
         """Effective collecting area of the telescope 
         (`astropy.units.Quantity`, read-only).
@@ -132,28 +140,3 @@ class Observatory:
             bandpass = photUtils.Bandpass()
             bandpass.read_throughput(filename)
             self._bandpasses[band] = bandpass
-
-    def get_bandpass(self, band):
-        """Get a bandpass from the dictionary.
-        
-        Parameters
-        ----------
-        band : `str`
-            Name of the filter band.
-
-        Returns
-        -------
-        bandpass : `rubin_sim.phot_utils.Bandpass`
-            Telescope throughput curve.
-
-        Raises
-        ------
-        ValueError
-            Raised if a filter band name is not a key for a bandpass in the
-            dictionary. 
-        """
-        if band not in self.bandpasses:
-            raise ValueError(f"Band {band} is not present in the dictionary")
-        bandpass = self.bandpasses[band]
-
-        return bandpass
