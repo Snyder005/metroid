@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from astropy.constants import G, M_earth, R_earth
+import astropy.constants as const
 import astropy.units as u
 import galsim
 import scipy
@@ -234,15 +235,14 @@ class BaseOrbitalObject:
         """
         adu = self.calculate_adu(observatory, band, magnitude)
         exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
-        bandpass = observatory.bandpass[band]
-        throughput = observatory.throughput[band]
+        bandpass = observatory.bandpasses[band]
+        throughput = observatory.throughputs[band]
+        effarea = observatory.effective_area
         lambda0 = bandpass.calc_eff_wavelen()[0]*u.nm
-        angular_extent = (observatory.effarea/self.distance**2).to(u.sr, 
-                                                                   equivalencies=u.dimensionless_angles())
+        angular_extent = (effarea/self.distance**2).to(u.sr, equivalencies=u.dimensionless_angles())
     
         nphotons = (adu*observatory.gain).value/exptime
-        power = nphotons*const.h*const.c/lambda0
-    
+        power = (nphotons*const.h*const.c/lambda0).to(u.W)
         radiant_intensity = power/throughput/angular_extent
     
         return radiant_intensity
