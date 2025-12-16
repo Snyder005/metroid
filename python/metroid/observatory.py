@@ -41,7 +41,6 @@ class Observatory:
         self._inner_radius = inner_radius.to(u.m)        
         self._pixel_scale = pixel_scale.to(u.arcsec/u.pix)
         self._bandpasses = dict()
-        self._throughputs = dict()
         self.add_bandpasses(bands)
         self._gain = gain.to(u.electron/u.adu)
 
@@ -142,7 +141,7 @@ class Observatory:
             bandpass.read_throughput(filename)
             self._bandpasses[band] = bandpass
 
-    def get_bandpass(self, band):
+    def get_bandpass(self, band): # is this even needed?
         """Get a bandpass from the dictionary.
         
         Parameters

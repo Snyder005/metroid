@@ -106,6 +106,11 @@ class BaseOrbitalObject:
         """
         return None
 
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        return None
+
     @property
     def orbital_velocity(self):
         """Orbital velocity (`astropy.units.Quantity`, read-only).
@@ -211,18 +216,19 @@ class BaseOrbitalObject:
 
     def calculate_radiant_intensity(self, observatory, band, magnitude):
         adu = self.calculate_adu(observatory, band, magnitude)
+        exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
         bandpass = observatory.bandpass[band]
         throughput = observatory.throughput[band]
         lambda0 = bandpass.calc_eff_wavelen()[0]*u.nm
         angular_extent = (observatory.effarea/self.distance**2).to(u.sr, 
                                                                    equivalencies=u.dimensionless_angles())
     
-        nphotons = adu*observatory.gain/self.calculate_pixel_exptime(observatory.pixel_scale)
+        nphotons = (adu*observatory.gain).value/exptime
         power = nphotons*const.h*const.c/lambda0
     
         radiant_intensity = power/throughput/angular_extent
     
-        return radiant_intensity        
+        return radiant_intensity
 
     def get_final_profile(self, psf, observatory, band=None, magnitude=None, exptime=None):
         """Create the convolution of the atmospheric PSF, defocus kernel, and 
@@ -409,6 +415,13 @@ class CircularOrbitalObject(BaseOrbitalObject):
 
         return profile
 
+    @property
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        area = np.pi*self.radius**2.
+        return area
+
 class RectangularOrbitalObject(BaseOrbitalObject):
     """A rectangular orbital object.
 
@@ -465,6 +478,13 @@ class RectangularOrbitalObject(BaseOrbitalObject):
             profile = self._project(profile)
 
         return profile
+    
+    @property
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        area = self.width*self.length
+        return area
 
 class CompositeOrbitalObject(BaseOrbitalObject):
     """A composite orbital object made up of smaller components.
@@ -515,3 +535,10 @@ class CompositeOrbitalObject(BaseOrbitalObject):
             profile = self._project(profile)
 
         return profile
+
+    @property
+    def area(self):
+        """Surface area (`astropy.units.Quantity`, read-only).
+        """
+        area = sum([component.area for component in self.components])
+        return area
