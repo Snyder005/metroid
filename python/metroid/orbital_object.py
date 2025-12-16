@@ -7,7 +7,7 @@ import scipy
 
 import rubin_sim.phot_utils as photUtils
 
-__all__ = ["DiskOrbitalObject", "RectangularOrbitalObject"]
+__all__ = ["CircularOrbitalObject", "RectangularOrbitalObject"]
 
 class BaseOrbitalObject:
     """A base class that defines attributes and methods common to all orbital
@@ -29,7 +29,7 @@ class BaseOrbitalObject:
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, phi=90*u.deg, nadir_pointing=True):
@@ -327,7 +327,7 @@ class BaseOrbitalObject:
 
         return glint_image
 
-    def _projection(self, profile):
+    def _project(self, profile):
         """Apply angle-of-view projection effects.
 
         Parameters
@@ -343,11 +343,11 @@ class BaseOrbitalObject:
 
         mu = np.cos(self.nadir_angle)
         angle = galsim.Angle(self.phi.to_value(u.deg), galsim.degrees)
-        projected_profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
+        profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
 
-        return projected_profile
+        return profile
 
-class DiskOrbitalObject(BaseOrbitalObject):
+class CircularOrbitalObject(BaseOrbitalObject):
     """A circular disk orbital object.
 
     Parameters
@@ -368,7 +368,7 @@ class DiskOrbitalObject(BaseOrbitalObject):
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, radius, phi=90*u.deg, nadir_pointing=True): 
@@ -390,7 +390,7 @@ class DiskOrbitalObject(BaseOrbitalObject):
         profile = galsim.TopHat(r)
 
         if self.nadir_pointing:
-            profile = self._projection(profile)
+            profile = self._project(profile)
 
         return profile
 
@@ -417,7 +417,7 @@ class RectangularOrbitalObject(BaseOrbitalObject):
     """
 
     nadir_pointing = None
-    """Nadir-point object if `True` (`bool`).
+    """Nadir-pointing object if `True` (`bool`).
     """
 
     def __init__(self, height, zenith_angle, width, length, phi=90*u.deg, nadir_pointing=True):
@@ -447,7 +447,7 @@ class RectangularOrbitalObject(BaseOrbitalObject):
         profile = galsim.Box(w, l)
 
         if self.nadir_pointing:
-            profile = self._projection(profile)
+            profile = self._project(profile)
 
         return profile
 
@@ -461,8 +461,10 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         Orbital height.
     zenith_angle : `astropy.units.Quantity`
         Observed angle from telescope zenith.
-    components : `list` [`leosim.Component`]
+    components : `list` [`metroid.BaseComponent`]
         A list of components.
+    phi : `astropy.units.Quantity`, optional
+        Angular orientation (90 degrees, by default)
 
     Raises
     ------
@@ -470,16 +472,19 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         Raised if ``components`` is of length 0.
     """
 
-    def __init__(self, height, zenith_angle, components):
-        super().__init__(height, zenith_angle)
+    nadir_pointing = None
+    """Nadir-pointing object if `True` (`bool`).
+    """
 
+    def __init__(self, height, zenith_angle, components, phi=90*u.deg, nadir_pointing=True):
+        super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
         if len(components) == 0: # Need a way to check this is a non-empty list or tuple (or similar).
             raise ValueError("components list must include at least one component.")
         self._components = components
 
     @property
     def components(self):
-        """A list of components. (`list` [`leosim.Component`], 
+        """A list of components. (`list` [`metroid.BaseComponent`], 
         read-only).
         """
         return self._components        
@@ -489,6 +494,12 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         """Orbital object geometric surface brightness profile 
         (`galsim.GSObject`, read-only).
         """
+
         # Check create_profile method for proper astropy unit conversion.
         component_profiles = [component.create_profile(self.distance) for component in self.components]
-        return galsim.Sum(*component_profiles)
+        profile = galsim.Sum(*component_profiles)
+
+        if self.nadir_pointing:
+            profile = self._project(profile)
+
+        return profile
