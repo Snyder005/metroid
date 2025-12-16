@@ -140,28 +140,3 @@ class Observatory:
             bandpass = photUtils.Bandpass()
             bandpass.read_throughput(filename)
             self._bandpasses[band] = bandpass
-
-    def get_bandpass(self, band): # is this even needed?
-        """Get a bandpass from the dictionary.
-        
-        Parameters
-        ----------
-        band : `str`
-            Name of the filter band.
-
-        Returns
-        -------
-        bandpass : `rubin_sim.phot_utils.Bandpass`
-            Telescope throughput curve.
-
-        Raises
-        ------
-        ValueError
-            Raised if a filter band name is not a key for a bandpass in the
-            dictionary. 
-        """
-        if band not in self.bandpasses:
-            raise ValueError(f"Band {band} is not present in the dictionary")
-        bandpass = self.bandpasses[band]
-
-        return bandpass
