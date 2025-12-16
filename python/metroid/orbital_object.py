@@ -209,6 +209,21 @@ class BaseOrbitalObject:
 
         return adu
 
+    def calculate_radiant_intensity(self, observatory, band, magnitude):
+        adu = self.calculate_adu(observatory, band, magnitude)
+        bandpass = observatory.bandpass[band]
+        throughput = observatory.throughput[band]
+        lambda0 = bandpass.calc_eff_wavelen()[0]*u.nm
+        angular_extent = (observatory.effarea/self.distance**2).to(u.sr, 
+                                                                   equivalencies=u.dimensionless_angles())
+    
+        nphotons = adu*observatory.gain/self.calculate_pixel_exptime(observatory.pixel_scale)
+        power = nphotons*const.h*const.c/lambda0
+    
+        radiant_intensity = power/throughput/angular_extent
+    
+        return radiant_intensity        
+
     def get_final_profile(self, psf, observatory, band=None, magnitude=None, exptime=None):
         """Create the convolution of the atmospheric PSF, defocus kernel, and 
         satellite profiles.
@@ -451,7 +466,6 @@ class RectangularOrbitalObject(BaseOrbitalObject):
 
         return profile
 
-# Under construction
 class CompositeOrbitalObject(BaseOrbitalObject):
     """A composite orbital object made up of smaller components.
 
@@ -478,7 +492,7 @@ class CompositeOrbitalObject(BaseOrbitalObject):
 
     def __init__(self, height, zenith_angle, components, phi=90*u.deg, nadir_pointing=True):
         super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
-        if len(components) == 0: # Need a way to check this is a non-empty list or tuple (or similar).
+        if len(components) == 0:
             raise ValueError("components list must include at least one component.")
         self._components = components
 
@@ -494,8 +508,6 @@ class CompositeOrbitalObject(BaseOrbitalObject):
         """Orbital object geometric surface brightness profile 
         (`galsim.GSObject`, read-only).
         """
-
-        # Check create_profile method for proper astropy unit conversion.
         component_profiles = [component.create_profile(self.distance) for component in self.components]
         profile = galsim.Sum(*component_profiles)
 

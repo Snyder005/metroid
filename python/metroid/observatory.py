@@ -1,5 +1,3 @@
-__all__ = ("Observatory",)
-
 import os
 import astropy.units as u
 import numpy as np
@@ -43,6 +41,7 @@ class Observatory:
         self._inner_radius = inner_radius.to(u.m)        
         self._pixel_scale = pixel_scale.to(u.arcsec/u.pix)
         self._bandpasses = dict()
+        self._throughputs = dict()
         self.add_bandpasses(bands)
         self._gain = gain.to(u.electron/u.adu)
 
@@ -79,6 +78,16 @@ class Observatory:
         names (`dict` [`str`, `rubin_sim.phot_utils.Bandpass`], read-only).
         """
         return self._bandpasses
+
+    @property
+    def throughputs(self):
+        throughputs = {}
+        for band, bandpass in self.bandpasses.items():
+            dlambda = bandpass.wavelen[1]-bandpass.wavelen[0]
+            throughput = np.sum(bandpass.sb*dlambda/bandpass.wavelen)
+            throughputs[band] = throughput
+    
+        return throughputs
 
     @property
     def effective_area(self):
