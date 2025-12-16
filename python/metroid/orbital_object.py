@@ -7,7 +7,7 @@ import scipy
 
 import rubin_sim.phot_utils as photUtils
 
-__all__ = ["CircularOrbitalObject", "RectangularOrbitalObject"]
+__all__ = ["CircularOrbitalObject", "RectangularOrbitalObject", "CompositeOrbitalObject"]
 
 class BaseOrbitalObject:
     """A base class that defines attributes and methods common to all orbital
@@ -106,6 +106,7 @@ class BaseOrbitalObject:
         """
         return None
 
+    @property
     def area(self):
         """Surface area (`astropy.units.Quantity`, read-only).
         """
@@ -189,10 +190,10 @@ class BaseOrbitalObject:
 
         Parameters
         __________
-        observatory : `leosim.Observatory`
+        observatory : `metroid.Observatory`
             Observatory viewing the orbital object.
         band : `str`
-            Name of filter band.
+            Name of the filter band.
         magnitude : `float`
             Stationary AB magnitude.
         exptime : `astropy.units.Quantity`, optional
@@ -215,6 +216,22 @@ class BaseOrbitalObject:
         return adu
 
     def calculate_radiant_intensity(self, observatory, band, magnitude):
+        """Calculate the radiant intensity.
+
+        Parameters
+        ----------
+        observatory : `metroid.Observatory`
+            Observatory viewing the orbital object.
+        band : `str`
+            Name of the filter band.
+        magnitude : `float`
+            Stationary AB magnitude.
+    
+        Returns
+        -------
+        radiant_intensity : `astropy.units.Quantity`
+            Radiant intensity.
+        """
         adu = self.calculate_adu(observatory, band, magnitude)
         exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
         bandpass = observatory.bandpass[band]
@@ -238,10 +255,10 @@ class BaseOrbitalObject:
         ----------
         psf : `galsim.GSObject`
             A surface brightness profile representing an atmospheric PSF.
-        observatory : `leosim.Observatory`
+        observatory : `metroid.Observatory`
             Observatory viewing the orbital object.
         band : `str`, optional
-            Name of filter band (None, by default).
+            Name of the filter band (None, by default).
         magnitude : `float`, optional
             Stationary AB magnitude (None, by default).
         exptime : `astropy.units.Quantity`, optional
@@ -271,7 +288,7 @@ class BaseOrbitalObject:
         ----------
         psf : `galsim.GSObject`
             A surface brightness profile representing an atmospheric PSF.
-        observatory : `leosim.Observatory`
+        observatory : `metroid.Observatory`
             Observatory viewing the orbital object.
         nx : `int`
             The x-direction size of the image.
@@ -280,7 +297,7 @@ class BaseOrbitalObject:
         scale : `float`
             Pixel scale of the image.
         band : `str`, optional
-            Name of filter band. (None, by default).
+            Name of the filter band. (None, by default).
         magnitude : `float`, optional
             Stationary AB magnitude (None, by default).      
         apply_gain: `bool`, optional
@@ -312,7 +329,7 @@ class BaseOrbitalObject:
         ----------
         psf : `galsim.GSObject`
             A surface brightness profile representing an atmospheric PSF.
-        observatory : `leosim.Observatory`
+        observatory : `metroid.Observatory`
             Observatory viewing the orbital object.
         band : `str`
             Name of filter band.
@@ -332,7 +349,6 @@ class BaseOrbitalObject:
         glint_image : `galsim.Image`
             Image of a glint.
         """
-
         final = self.get_final_profile(psf, observatory, band=band, magnitude=magnitude, exptime=glint_time)        
         image = final.drawImage(nx=nx, ny=ny, scale=scale)
         
@@ -361,7 +377,6 @@ class BaseOrbitalObject:
         projected_profile: `galsim.GSObject`
             The projected surface brightness profile.
         """
-
         mu = np.cos(self.nadir_angle)
         angle = galsim.Angle(self.phi.to_value(u.deg), galsim.degrees)
         profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
@@ -540,5 +555,5 @@ class CompositeOrbitalObject(BaseOrbitalObject):
     def area(self):
         """Surface area (`astropy.units.Quantity`, read-only).
         """
-        area = sum([component.area for component in self.components])
+        area = u.sum([component.area for component in self.components])
         return area
