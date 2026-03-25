@@ -210,7 +210,7 @@ class BaseOrbitalObject:
             exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
 
         photo_params = observatory.get_photo_params(exptime.to(u.s))
-        bandpass = observatory.get_bandpass(band)
+        bandpass = observatory.bandpasses[band]
         m0_adu = self.sed.calc_adu(bandpass, phot_params=photo_params)
         adu = m0_adu*(10**(-magnitude/2.5))
 
