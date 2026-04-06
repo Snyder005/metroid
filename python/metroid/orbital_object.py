@@ -1,368 +1,272 @@
+from abc import ABC, abstractmethod
+from astropy import units as u
+from astropy.constants as import G, R_earth, M_earth
 import numpy as np
-import os
-from astropy.constants import G, M_earth, R_earth
-import astropy.constants as const
-import astropy.units as u
 import galsim
-import scipy
 
-import rubin_sim.phot_utils as photUtils
+def check_quantity(quantity, unit, vmin=None, vmax=None):
+    """Performs a sequence of checks on an astropy Quantity.
 
-__all__ = ["CircularOrbitalObject", "RectangularOrbitalObject", "CompositeOrbitalObject"]
+    Parameters
+    ----------
+    quantity : `astropy.units.Quantity`
+        A quantity to check.
+    unit : `astropy.units.Unit`
+        The expected unit of the quantity.
+    vmin : `float`, optional
+        The minimum limit in the expected unit (None, by default).
+    vmax : `float`, optional
+        The maximum limit in the expected unit (None, by default).
 
-class BaseOrbitalObject:
-    """A base class that defines attributes and methods common to all orbital
-    objects.
+    Returns
+    -------
+    quantity : `astropy.units.Quantity`
+        The verified quantity.
+
+    Raises
+    ------
+    TypeError
+        Raised if `quantity` is an invalid type.
+    ValueError
+        Raised if `quantity` has an invalid unit or value.
+    """
+    is not isinstance(quantity, u.Quantity):
+        raise TypeError(f"'{type(value).__name__}' object must be 'astropy.units.Quantity'")
+
+    if not quantity.unit.is_equivalent(unit):
+        raise ValueError(f"object unit {quantity.unit} not equivalent with {unit}")
+
+    if vmin is not None and quantity < vmin*unit:
+        raise ValueError(f"quantity must be >= {vmin*unit}")
+
+    if vmax is not None and quantity > vmax*unit:
+        raise ValueError(f"quantity must be <= {vmax*unit}")
+
+    return quantity
+
+class BaseOrbitalObject(ABC):
+    """An abstract base class that defines attributes and methods common to
+    all orbital objects.
 
     Parameters
     ----------
     height : `astropy.units.Quantity`
-        Orbital height.
+        The orbital height of the object.
     zenith_angle : `astropy.units.Quantity`
-        Observed angle from telescope zenith.
-    phi : `astropy.units.Quantity`, optional
-        Angular orientation (90 degrees, by default).
+        The angle from telescope zenith to the object.
+    rotation_angle : `astropy.units.Quantity`, optional
+        The rotation angle of the object (90 degrees, by default).
+    nadir_pointing : `bool`, optional
+        Object is nadir pointing if `True` (`False`, by default).
 
     Raises
     ------
+    TypeError
+        Raised if a parameter is an invalid type.
     ValueError
-        Raised if parameter ``zenith_angle`` is less than 0 deg.
+        Raised if a quantity has an invalid unit or value.
     """
-
+    
     nadir_pointing = None
-    """Nadir-pointing object if `True` (`bool`).
-    """
+    """Nadir-pointing object if `True` (`bool`)."""
 
-    def __init__(self, height, zenith_angle, phi=90*u.deg, nadir_pointing=True):
+    def __init__(self, height, zenith_angle, rotation_angle=90*u.deg, nadir_pointing=False):
         self.height = height
         self.zenith_angle = zenith_angle
-        self._phi = phi
-        self.nadir_pointing = nadir_pointing
-        self._sed = photUtils.Sed()
-        self._sed.set_flat_sed()
+        self.rotation_angle = rotation_angle
+        if isinstance(nadir_pointing, bool):
+            self.nadir_pointing = nadir_pointing
+        else:
+            raise TypeError("'{type(nadir_pointing).__name__}' object must be 'bool'")
 
     @property
     def height(self):
-        """Orbital height (`astropy.units.Quantity`).
-        """
-        return self._height
+        """The orbital height of the object (`astropy.units.Quantity`)."""
+        return self._height.to(u.km)
 
     @height.setter
-    def height(self, value):
-        self._height = value.to(u.km)
+    def height(self, quantity):
+        self._height = check_quantity(quantity, u.km, vmin=100.0)
+
+    @property
+    def rotation_angle(self):
+        """The rotation angle of the object."""
+        return self._rotation_angle.to(u.deg)
+
+    @rotation_angle.setter
+    def rotation_angle(self, quantity):
+        self._rotation_angle = check_quantity(quantity, u.deg)
 
     @property
     def zenith_angle(self):
-        """Angle from telescope zenith to orbital object 
+        """The angle from telescope zenith to the object 
         (`astropy.units.Quantity`).
         """
-        return self._zenith_angle
+        return self._zenith_angle.to(u.deg)
 
     @zenith_angle.setter
-    def zenith_angle(self, value):
-        if value.to(u.deg) < 0.:
-            raise ValueError('zenith_angle cannot be less than 0 deg')
-        self._zenith_angle = value.to(u.deg)
-
-    @property
-    def phi(self):
-        """Angular orientation (`astropy.units.Quantity`).
-        """
-        return self._phi
-
-    @phi.setter
-    def phi(self, value):
-        self._phi = value.to(u.deg)
+    def zenith_angle(self, quantity):
+        self._zenith_angle = check_quantity(quantity, u.deg, vmin=0.0, vmax=90.0)
 
     @property
     def nadir_angle(self):
-        """Angle from orbital object nadir to telescope 
+        """The angle from the object nadir to the telescope 
         (`astropy.units.Quantity`, read-only).
         """
-        nadir_angle = np.arcsin(R_earth*np.sin(self.zenith_angle)/(R_earth + self.height))
-        return nadir_angle.to(u.deg)
+        theta_z = self.zenith_angle
+        h = self.height
+
+        theta_n = np.arcsin(R_earth*np.sin(theta_z)/(R_earth + h))
+        return theta_n.to(u.deg)
 
     @property
     def distance(self):
-        """Distance to orbital object from telescope (`astropy.units.Quantity`, 
-        read-only).
+        """The distance to the object from the telescope 
+        (`astropy.units.Quantity`, read-only).
         """
-        if np.isclose(self.nadir_angle.value, 0):
-            distance = self.height
-        else:
-            distance = np.sin(self.zenith_angle - self.nadir_angle)*R_earth/np.sin(self.nadir_angle)
-        return distance.to(u.km)
+        theta_n = self.nadir_angle
+        theta_z = self.zenith_angle
 
-    @property
-    def sed(self):
-        """Spectral energy distribution (`rubin_sim.phot_utils.Sed`, 
-        read-only).
-        """
-        return self._sed
-
-    @property
-    def profile(self):
-        """Orbital object geometric surface brightness profile 
-        (`galsim.GSObject`, read-only).
-        """
-        return None
-
-    @property
-    def area(self):
-        """Surface area (`astropy.units.Quantity`, read-only).
-        """
-        return None
+        if np.isclose(self.nadir_angle.value, 0, atol=1e-09):
+            return self.height
+        d = np.sin(theta_z - theta_n)*R_earth/np.sin(theta_n)
+        return d.to(u.km)
 
     @property
     def orbital_velocity(self):
-        """Orbital velocity (`astropy.units.Quantity`, read-only).
+        """The orbital velocity of the object (`astropy.units.Quantity`, 
+        read-only).
         """
-        v = np.sqrt(G*M_earth/(R_earth + self.height))
+        h = self.height
+
+        v = np.sqrt(G*M_earth/(R_earth + h))
         return v.to(u.m/u.s, equivalencies=u.dimensionless_angles())
 
     @property
-    def orbital_omega(self):
-        """Orbital angular velocity (`astropy.units.Quantity`, read-only).
+    def orbital_angular_velocity(self):
+        """The orbital angular velocity of the object 
+        (`astropy.units.Quantity`, read-only).
         """
-        omega = self.orbital_velocity/(R_earth + self.height)
+        v_o = self.orbital_velocity
+        h = self.height
+
+        omega = v_o/(R_earth + h)
         return omega.to(u.rad/u.s, equivalencies=u.dimensionless_angles())
 
     @property
     def perpendicular_velocity(self):
-        """Velocity perpendicular to the line-of-sight vector 
-        (`astropy.units.Quantity`, read-only).
+        """The velocity of the object perpendicular to the line-of-sight 
+        vector (`astropy.units.Quantity`, read-only).
         """
-        v = self.orbital_velocity*np.cos(self.nadir_angle)
-        return v.to(u.m/u.s, equivalencies=u.dimensionless_angles())
+        v_o = self.orbital_velocity
+        theta_n = self.nadir_angle
+
+        v_p = v_o*np.cos(theta_n)
+        return v_p.to(u.m/u.s, equivalencies=u.dimensionless_angles())
 
     @property
-    def perpendicular_omega(self):
-        """Angular velocity perpendicular to the line-of-sight vector 
-        (`astropy.units.Quantity`, read-only).
+    def perpendicular_angular_velocity(self):
+        """Angular velocity of the object perpendicular to the line-of-sight
+        vector (`astropy.units.Quantity`, read-only).
         """
-        omega = self.perpendicular_velocity/self.distance
-        return omega.to(u.rad/u.s, equivalencies=u.dimensionless_angles())
+        v_p = self.perpendicular_velocity
+        d = self.distance
 
-    def get_defocus_profile(self, observatory):
+        omega_p = v_p/d
+        return omega_p.to(u.rad/u.s, equivalencies=u.dimensionless_angles())
+
+    @property
+    @abstractmethod
+    def profile(self):
+        pass
+
+    @property
+    @abstractmethod
+    def area(self):
+        pass
+
+    def get_defocus_profile(self, telescope_pupil):
         """Create the defocus kernel profile.
 
         Parameterss
         ----------
-        observatory : `leosim.Observatory`
-            Observatory viewing the orbital object.
+        telescope_pupil : `metroid.Pupil`
+             The pupil of the telescope that is observing the object.
         
         Returns
         -------
         defocus : `galsim.GSObject`
-            Defocus kernel profile.
-        """
-        r_o = (observatory.outer_radius/self.distance).to_value(u.arcsec, 
-                                                                equivalencies=u.dimensionless_angles())
-        r_i = (observatory.inner_radius/self.distance).to_value(u.arcsec, 
-                                                                equivalencies=u.dimensionless_angles())
-        defocus = galsim.TopHat(r_o) - galsim.TopHat(r_i, flux=(r_i/r_o)**2.)
+            The defocus kernel profile.
 
+        Raises
+        ------
+        TypeError
+            Raised if `telescope_pupil` is an invalid type.
+        """
+        if not isinstance(telescope_pupil, Pupil):
+            raise TypeError(f"'{type(value).__name__}' object must be 'metroid.Pupil'")
+        outer_radius = telescope_pupil.outer_radius/self.distance
+        inner_radius = telescope_pupil.inner_radius/self.distance
+
+        r_o = outer_radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        r_i = inner_radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        defocus = galsim.TopHat(r_o) - galsim.TopHat(r_i, flux=(r_i/r_o)**2.0)
         return defocus
 
-    def calculate_pixel_exptime(self, pixel_scale): # take an observatory or any pixel scale?
-        """Calculate the pixel traversal exposure time.
+    def calculate_pixel_time(self, pixel_scale):
+        """Calculate the pixel traversal time of the object.
 
-        The pixel traversal exposure time is the time for the orbital object to
-        traverse a single pixel that is dependent on the angular velocity
+        The pixel traversal time is the time for the object to traverse a 
+        single pixel, which depends on the angular velocity of the object
         perpendicular to the line-of-sight vector.
 
         Parameters
         ----------
         pixel_scale : `astropy.units.Quantity`
-            Instrument pixel scale.
+            The pixel scale of the imaging device.
 
         Returns
         -------
-        pixel_exptime : `astropy.units.Quantity`
-            Pixel traversal exposure time.
+        pixel_time : `astropy.units.Quantity`
+            The pixel traversal time of the object.
+
+        Raises
+        ------
+        TypeError
+            Raised if `pixel_scale` is an invalid type.
+        ValueError
+            Raised if `pixel_scale` has an invalid unit or value.
         """
-        pixel_scale = pixel_scale.to(u.arcsec/u.pix)
-        pixel_exptime = pixel_scale/self.perpendicular_omega
+        pixel_scale = check_quantity(pixel_scale, u.arcsec/u.pix, vmin=0.0)
+        omega_p = self.perpendicular_angular_velocity
 
-        return pixel_exptime.to(u.s, equivalencies=[(u.pix, None)])
+        t_p = pixel_scale/omega_p
+        return t_p.to(u.s, equivalencies=[(u.pix, None)])
 
-    def calculate_adu(self, observatory, band, magnitude, exptime=None):
-        """Calculate the number of ADU from the camera.
+    def get_tracked_profile(self, psf, telescope_pupil):
+        """Create the tracked profile from the convolution of the atmospheric
+        PSF, defocus kernel, and object profiles.
 
-        Parameters
-        __________
-        observatory : `metroid.Observatory`
-            Observatory viewing the orbital object.
-        band : `str`
-            Name of the filter band.
-        magnitude : `float`
-            Stationary AB magnitude.
-        exptime : `astropy.units.Quantity`, optional
-            Exposure time. If None, the pixel traversal exposure time will be 
-            used.
-
-        Returns
-        -------
-        adu : `float`
-            Number of ADU.
-        """
-        if exptime is None:
-            exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
-
-        photo_params = observatory.get_photo_params(exptime.to(u.s))
-        bandpass = observatory.bandpasses[band]
-        m0_adu = self.sed.calc_adu(bandpass, phot_params=photo_params)
-        adu = m0_adu*(10**(-magnitude/2.5))
-
-        return adu
-
-    def calculate_radiant_intensity(self, observatory, band, magnitude):
-        """Calculate the radiant intensity.
-
-        Parameters
-        ----------
-        observatory : `metroid.Observatory`
-            Observatory viewing the orbital object.
-        band : `str`
-            Name of the filter band.
-        magnitude : `float`
-            Stationary AB magnitude.
-    
-        Returns
-        -------
-        radiant_intensity : `astropy.units.Quantity`
-            Radiant intensity.
-        """
-        adu = self.calculate_adu(observatory, band, magnitude)
-        exptime = self.calculate_pixel_exptime(observatory.pixel_scale)
-        bandpass = observatory.bandpasses[band]
-        throughput = observatory.throughputs[band]
-        effarea = observatory.effective_area
-        lambda0 = bandpass.calc_eff_wavelen()[0]*u.nm
-        angular_extent = (effarea/self.distance**2).to(u.sr, equivalencies=u.dimensionless_angles())
-    
-        nphotons = (adu*observatory.gain).value/exptime
-        power = (nphotons*const.h*const.c/lambda0).to(u.W)
-        radiant_intensity = power/throughput/angular_extent
-    
-        return radiant_intensity
-
-    def get_final_profile(self, psf, observatory, band=None, magnitude=None, exptime=None):
-        """Create the convolution of the atmospheric PSF, defocus kernel, and 
-        satellite profiles.
-        
         Parameters
         ----------
         psf : `galsim.GSObject`
             A surface brightness profile representing an atmospheric PSF.
-        observatory : `metroid.Observatory`
-            Observatory viewing the orbital object.
-        band : `str`, optional
-            Name of the filter band (None, by default).
-        magnitude : `float`, optional
-            Stationary AB magnitude (None, by default).
-        exptime : `astropy.units.Quantity`, optional
-            Exposure time. If None, the pixel traversal exposure time will be
-            used.
+        telescope_pupil: `metroid.Pupil`
+            The pupil of the telescope that is observing the object.
 
         Returns
         -------
-        final : `galsim.GSObject`
-            Final convolution of the component profiles.
+        tracked_profile : `galsim.GSObject`
+            The tracked profile of the object.
+
+        Raises
+        ------
+        TypeError
+            Raised if `telescope_pupil` or `psf` are invalid types.
         """
-        defocus = self.get_defocus_profile(observatory)
+        defocus = self.get_defocus_profile(telescope_pupil)
         final = galsim.Convolve([self.profile, defocus, psf])
-
-        if (band is not None) and (magnitude is not None):
-            adu = self.calculate_adu(observatory, band, magnitude, exptime)
-            final = final.withFlux(adu)
-
         return final
-
-    def get_streak_cross_section(self, psf, observatory, nx, ny, scale, band=None, magnitude=None, 
-                                 apply_gain=True):
-        """Calculate the cross section of a streak created by the orbital 
-        object in an image.
-
-        Parameters
-        ----------
-        psf : `galsim.GSObject`
-            A surface brightness profile representing an atmospheric PSF.
-        observatory : `metroid.Observatory`
-            Observatory viewing the orbital object.
-        nx : `int`
-            The x-direction size of the image.
-        ny : `int`
-            The y-direction size of the image.
-        scale : `float`
-            Pixel scale of the image.
-        band : `str`, optional
-            Name of the filter band. (None, by default).
-        magnitude : `float`, optional
-            Stationary AB magnitude (None, by default).      
-        apply_gain: `bool`, optional
-            If `True`, apply gain (`True`, by default).
-
-        Returns
-        -------
-        angular_distance : `astropy.units.Quantity`, (nx,)
-            Array of angular distances from the streak center.
-        cross_section : `astropy.units.Quantity`, (nx,)
-            Array of streak cross section signal values per pixel.
-        """
-        final = self.get_final_profile(psf, observatory, band=band, magnitude=magnitude)
-        image = final.drawImage(nx=nx, ny=ny, scale=scale)
-        cross_section = np.sum(image.array, axis=0)*observatory.pixel_scale.to_value(u.arcsec/u.pix)/scale
-        angular_distance = np.linspace(-int(nx*scale/2), int(nx*scale/2), nx)
-
-        cross_section *= u.adu/u.pix
-        if apply_gain:
-            cross_section *= observatory.gain
-        angular_distance *= u.arcsec
-
-        return angular_distance, cross_section
-
-    def get_glint_image(self, psf, observatory, band, magnitude, glint_time, nx, ny, scale):
-        """Create an image of a glint.
-
-        Parameters
-        ----------
-        psf : `galsim.GSObject`
-            A surface brightness profile representing an atmospheric PSF.
-        observatory : `metroid.Observatory`
-            Observatory viewing the orbital object.
-        band : `str`
-            Name of filter band.
-        magnitude : `float`
-            Stationary AB magnitude
-        glint_time : `astropy.units.Quantity`
-            Duration of glint.
-        nx : `int`
-            The x-direction size of the image.
-        ny : `int`
-            The y-direction size of the image.
-        scale : `float`
-            Pixel scale of the image.
-
-        Returns
-        -------
-        glint_image : `galsim.Image`
-            Image of a glint.
-        """
-        final = self.get_final_profile(psf, observatory, band=band, magnitude=magnitude, exptime=glint_time)        
-        image = final.drawImage(nx=nx, ny=ny, scale=scale)
-        
-        pixel_travel = int((glint_time*self.perpendicular_omega).to_value(u.arcsec)/scale)
-        glint_array = np.zeros(image.array.shape)
-        
-        win = scipy.signal.windows.boxcar(pixel_travel)/pixel_travel
-        for i in range(image.array.shape[1]):
-            glint_array[:, i] = scipy.signal.convolve(image.array[:, i], win, mode='same')
-        glint_array = glint_array*np.sum(image.array)/np.sum(glint_array)
-
-        glint_image = galsim.Image(glint_array, scale=image.scale)
-
-        return glint_image
 
     def _project(self, profile):
         """Apply angle-of-view projection effects.
@@ -378,49 +282,50 @@ class BaseOrbitalObject:
             The projected surface brightness profile.
         """
         mu = np.cos(self.nadir_angle)
-        angle = galsim.Angle(self.phi.to_value(u.deg), galsim.degrees)
-        profile = profile.rotate(angle).transform(mu, 0., 0., 1).rotate(-angle)/mu
+        phi = galsim.Angle(self.rotation_angle, galsim.degrees)
+        profile = profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi)/mu
 
         return profile
 
 class CircularOrbitalObject(BaseOrbitalObject):
-    """A circular disk orbital object.
+    """An orbital object in the shape of a circular disk.
 
     Parameters
     ----------
     height : `astropy.units.Quantity`
-        Orbital height.
+        The orbital height of the object.
     zenith_angle : `astropy.units.Quantity`
-        Observed angle from telescope zenith.
+        The angle from telescope zenith to the object.
     radius : `astropy.units.Quantity`
-        Radius of the orbital object.
-    phi : `astropy.units.Quantity`, optional
-        Angular orientation (90 degrees, by default).
+        The radius of the object.
+    rotation_angle : `astropy.units.Quantity`, optional
+        The rotation angle of the object (90 degrees, by default).
+    nadir_pointing : `bool`, optional
+        Object is nadir pointing if `True` (`False`, by default).
 
     Raises
     ------
+    TypeError
+        Raised if a parameter is an invalid type.
     ValueError
-        Raised if parameter ``zenith_angle`` is less than 0 deg.
+        Raised if a quantity has an invalid unit or value.
     """
 
-    nadir_pointing = None
-    """Nadir-pointing object if `True` (`bool`).
-    """
-
-    def __init__(self, height, zenith_angle, radius, phi=90*u.deg, nadir_pointing=True): 
-        super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
-        self._radius = radius.to(u.m)
+    def __init__(self, height, zenith_angle, radius, rotation_angle=90*u.km, nadir_pointing=False):
+        super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
+        self._radius = check_quantity(radius, u.m, vmin=0.0)
 
     @property
     def radius(self):
-        """Radius of the orbital object (`astropy.units.Quantity`, read-only).
+        """The radius of the object in meters (`astropy.units.Quantity`, 
+        read-only).
         """
-        return self._radius
+        return self._radius.to(u.m)
 
     @property
     def profile(self):
-        """Orbital object geometric surface brightness profile 
-        (`galsim.TopHat`, read-only).
+        """The surface brightness profile of the object (`galsim.TopHat`, 
+        read-only).
         """
         r = (self.radius/self.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.TopHat(r)
@@ -432,57 +337,60 @@ class CircularOrbitalObject(BaseOrbitalObject):
 
     @property
     def area(self):
-        """Surface area (`astropy.units.Quantity`, read-only).
+        """The surface area of the object (`astropy.units.Quantity`, 
+        read-only).
         """
-        area = np.pi*self.radius**2.
-        return area
+        r = self.radius
 
-class RectangularOrbitalObject(BaseOrbitalObject):
-    """A rectangular orbital object.
+        A = np.pi*r**2.
+        return A.to(u.m*u.m)
+
+class RectangularOrbitalObject:
+    """An orbital object in the shape of a rectangle.
 
     Parameters
     ----------
     height : `astropy.units.Quantity`
-        Orbital height.
+        The orbital height of the object.
     zenith_angle : `astropy.units.Quantity`
-        Observed angle from telescope zenith.
+        The angle from telescope zenith to the object.
     width : `astropy.units.Quantity`
-        Width of the orbital object.
+        The width of the object.
     length : `astropy.units.Quantity`
-        Length of the orbital object.
-    phi : `astropy.units.Quantity`, optional
-        Angular orientation (90 degrees, by default).
+        The length of the object.
+    rotation_angle : `astropy.units.Quantity`, optional
+        The rotation angle of the object (90 degrees, by default).
+    nadir_pointing : `bool`, optional
+        Object is nadir pointing if `True` (`False`, by default).
 
     Raises
     ------
+    TypeError
+        Raised if a parameter is an invalid type.
     ValueError
-        Raised if parameter ``zenith_angle`` is less than 0 deg.
+        Raised if a quantity has an invalid unit or value.
     """
 
-    nadir_pointing = None
-    """Nadir-pointing object if `True` (`bool`).
-    """
-
-    def __init__(self, height, zenith_angle, width, length, phi=90*u.deg, nadir_pointing=True):
-        super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
-        self._width = width.to(u.m)
-        self._length = length.to(u.m)
+    def __init__(self, height, zenith_angle, width, length, rotation_angle=90*u.deg, nadir_pointing=False):
+        super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
+        self._width = check_quantity(width)
+        self._length = check_quantity(length)
 
     @property
     def width(self):
-        """Width of the orbital object (`astropy.units.Quantity`, read-only).
+        """The width of the object (`astropy.units.Quantity`, read-only).
         """
         return self._width
 
     @property
     def length(self):
-        """Length of the orbital object (`astropy.units.Quantity`, read-only).
+        """The length of the object (`astropy.units.Quantity`, read-only).
         """
         return self._length
 
     @property
     def profile(self):
-        """Orbital object geometric surface brightness profile (`galsim.Box`, 
+        """The surface brightness profile of the object (`galsim.Box`, 
         read-only).
         """
         w = (self.width/self.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
@@ -496,64 +404,11 @@ class RectangularOrbitalObject(BaseOrbitalObject):
     
     @property
     def area(self):
-        """Surface area (`astropy.units.Quantity`, read-only).
-        """
-        area = self.width*self.length
-        return area
-
-class CompositeOrbitalObject(BaseOrbitalObject):
-    """A composite orbital object made up of smaller components.
-
-    Parameters
-    ----------
-    height : `astropy.units.Quantity`
-        Orbital height.
-    zenith_angle : `astropy.units.Quantity`
-        Observed angle from telescope zenith.
-    components : `list` [`metroid.BaseComponent`]
-        A list of components.
-    phi : `astropy.units.Quantity`, optional
-        Angular orientation (90 degrees, by default)
-
-    Raises
-    ------
-    ValueError
-        Raised if ``components`` is of length 0.
-    """
-
-    nadir_pointing = None
-    """Nadir-pointing object if `True` (`bool`).
-    """
-
-    def __init__(self, height, zenith_angle, components, phi=90*u.deg, nadir_pointing=True):
-        super().__init__(height, zenith_angle, phi=phi, nadir_pointing=nadir_pointing)
-        if len(components) == 0:
-            raise ValueError("components list must include at least one component.")
-        self._components = components
-
-    @property
-    def components(self):
-        """A list of components. (`list` [`metroid.BaseComponent`], 
+        """The surface area of the object (`astropy.units.Quantity`, 
         read-only).
         """
-        return self._components        
+        w = self.width
+        l = self.length
 
-    @property
-    def profile(self):
-        """Orbital object geometric surface brightness profile 
-        (`galsim.GSObject`, read-only).
-        """
-        component_profiles = [component.create_profile(self.distance) for component in self.components]
-        profile = galsim.Sum(*component_profiles)
-
-        if self.nadir_pointing:
-            profile = self._project(profile)
-
-        return profile
-
-    @property
-    def area(self):
-        """Surface area (`astropy.units.Quantity`, read-only).
-        """
-        area = u.sum([component.area for component in self.components])
-        return area
+        A = w*l
+        return A.to(u.m*u.m)
