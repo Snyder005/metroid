@@ -9,7 +9,7 @@ def check_quantity(
         inclusive_min: bool = False, 
         inclusive_max: bool = False,
     ) -> u.Quantity:
-    """Performs a sequence of checks on an astropy Quantity.
+    """Perform a sequence of checks on an astropy Quantity.
 
     Parameters
     ----------

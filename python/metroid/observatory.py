@@ -5,33 +5,80 @@ import galsim
 from metroid.utils.validation import check_quantity
 
 class Pupil(ABC):
+    """Abstract base class for telescope pupils."""
 
     @property
     @abstractmethod
     def area(self) -> u.Quantity:
+        """Surface area, in square meters (`astropy.units.Quantity`, 
+        read-only).
+        """
         pass
 
     @abstractmethod
     def get_profile(self, distance: u.Quantity) -> galsim.GSObject:
+        """Get the surface brightness profile.
+
+        Parameters
+        ----------
+        distance : `astropy.units.Quantity`
+            Distance from the pupil, in kilometers.
+
+        Returns
+        -------
+        profile : `galsim.GSObject`
+            Surface brightness profile.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``distance`` is an invalid type.
+        ValueError
+            Raised if ``distance`` has an invalid unit or value.
+        """
         pass
 
 class CircularPupil(Pupil):
+    """Circular telescope pupil."""
 
     def __init__(self, radius: u.Quantity):
         self._radius = check_quantity(radius, u.m, vmin=0.0)
 
     @property
     def radius(self) -> u.Quantity:
+        """Radius, in meters (`astropy.units.Quantity`, read-only)."""
         return self._radius.to(u.m)
 
     @property
     def area(self) -> u.Quantity:
+        """Surface area, in square meters (`astropy.units.Quantity`, 
+        read-only).
+        """
         r = self.radius
         
         A = np.pi*r**2
         return A.to(u.m*u.m)
 
     def get_profile(self, distance: u.Quantity) -> galsim.TopHat:
+        """Get the surface brightness profile.
+
+        Parameters
+        ----------
+        distance : `astropy.unit.Quantity`
+            Distance from the pupil, in kilometers.
+
+        Returns
+        -------
+        profile : `galsim.TopHat`
+            Radial tophat profile.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``distance`` is an invalid type.
+        ValueError
+            Raised if ``distance`` has an invalid unit or value.
+        """
         distance = check_quantity(distance, u.km, vmin=100.0)
         radius = self.outer_radius/distance
 
@@ -47,13 +94,38 @@ class AnnularPupil(Pupil):
         
     @property
     def inner_radius(self) -> u.Quantity:
+        """Inner radius of the pupil, in meters (`astropy.units.Quantity`,
+        read-only).
+        """
         return self._inner_radius.to(u.m)
 
     @property
     def outer_radius(self) -> u.Quantity:
+        """Outer radius of the pupil, in meters (`astropy.units.Quantity`,
+        read-only).
+        """
         return self._outer_radius.to(u.m)
 
     def get_profile(self, distance: u.Quantity) -> galsim.Sum:
+         """Get the surface brightness profile.
+
+        Parameters
+        ----------
+        distance : `astropy.unit.Quantity`
+            Distance from the pupil, in units of km.
+
+        Returns
+        -------
+        profile : `galsim.Sum`
+            Annular profile.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``distance`` is an invalid type.
+        ValueError
+            Raised if ``distance`` has an invalid unit or value.
+        """
         distance = check_quantity(distance, u.km, vmin=100.0)
         outer_radius = self.outer_radius/distance
         inner_radius = self.inner_radius/distance
