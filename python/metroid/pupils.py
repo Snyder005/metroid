@@ -1,21 +1,23 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from astropy import units as u
 import galsim
-from typing import Any, Self
+from typing import Self, ClassVar
 
 from metroid.utils.validation import check_quantity
 
 class Pupil(ABC):
     """Abstract base class for telescope pupils."""
-    _registry = {}
+    _registry = ClassVar[dict[str, type[Pupil]]] = {}
 
-    def __init_subclass__(cls, pupil_type: str = None, **kwargs):
+    def __init_subclass__(cls, pupil_type: str | None = None, **kwargs):
         super().__init_subclass__(**kwargs)
         if pupil_type:
             cls._registry[pupil_type] = cls
 
     @classmethod
-    def from_config(cls, config: dict[str, str | float]):
+    def from_config(cls, config: dict[str, str | float]) -> Pupil:
         config = config.copy()
 
         try:
@@ -31,7 +33,7 @@ class Pupil(ABC):
         return subcls._from_config(config)
 
     @classmethod
-    def from_json(cls, infile: str):
+    def from_json(cls, infile: str) -> Pupil:
 
         with open(infile) as f:
             full_config = json.load(f)
@@ -45,7 +47,7 @@ class Pupil(ABC):
 
     @classmethod
     @abstractmethod
-    def _from_config(cls, config: dict[str, Any]):
+    def _from_config(cls, config: dict[str, float]) -> Self:
         pass
 
     @property
@@ -92,6 +94,7 @@ class CircularPupil(Pupil):
             radius = config['radius']
         except KeyError:
             raise ValueError("missing required field 'radius'")
+
         if not isinstance(radius, float):
             raise TypeError("must be 'float'")
 
@@ -146,12 +149,13 @@ class AnnularPupil(Pupil):
         self._outer_radius = check_quantity(outer_radius, u.m, vmin=inner_radius.to_value(u.m))
         
     @classmethod
-    def from_config(cls, config: dict[str, float]) -> Self:
+    def _from_config(cls, config: dict[str, float]) -> Self:
 
         try:
             inner_radius = config['inner_radius']
         except KeyError:
             raise ValueError(f"missing required field 'inner_radius'")
+
         if not isinstance(inner_radius, float):
             raise TypeError("must be 'float'")
 
@@ -159,6 +163,7 @@ class AnnularPupil(Pupil):
             outer_radius = config['outer_radius']
         except KeyError:
             raise ValueError(f"missing required field 'outer_radius'")
+
         if not isinstance(inner_radius, float):
             raise TypeError("must be 'float'")
         
