@@ -1,5 +1,21 @@
 from astropy import units as u
 import operator
+from typing import TypeVar
+
+T = TypeVar("T", str, float, list)
+
+
+def get_field_value(config: dict[str, str | float | list], name: str, dtype: type[T]) -> T:
+    try:
+        value = config[name]
+    except KeyError:
+        raise ValueError(f"missing required field '{name}'")
+
+    if not isinstance(value, dtype):
+        raise TypeError("value must be '{dtype.__name__}'")
+
+    return value
+
 
 def check_quantity(
         quantity: u.Quantity, 
@@ -38,20 +54,20 @@ def check_quantity(
     ValueError
         Raised if `quantity` has an invalid unit or value.
     """
-    is not isinstance(quantity, u.Quantity):
+    if not isinstance(quantity, u.Quantity):
         raise TypeError(f"must be 'astropy.units.Quantity'")
 
     if not quantity.unit.is_equivalent(unit):
         raise ValueError(f"{quantity.unit} not equivalent with {unit}")
 
     if vmin is not None:
-        min_op, op = (operator.lt, '>=') if inclusive_min else (operator.le, '>')
-        if min_op(quantity, vmin*unit):
-            raise ValueError(f"{quantity} must be {op} {vmin*unit}")
+        min_op, op = (operator.lt, ">=") if inclusive_min else (operator.le, ">")
+        if min_op(quantity, vmin * unit):
+            raise ValueError(f"{quantity} must be {op} {vmin * unit}")
 
-    if vmax is not None: 
-        max_op, op = (operator.gt, '<=') if inclusive_min else (operator.ge, '<')
-        if max_op(quantity, vmax*unit):
-            raise ValueError(f"{quantity} must be {op} {vmax*unit}")
+    if vmax is not None:
+        max_op, op = (operator.gt, "<=") if inclusive_min else (operator.ge, "<")
+        if max_op(quantity, vmax * unit):
+            raise ValueError(f"{quantity} must be {op} {vmax * unit}")
 
     return quantity
