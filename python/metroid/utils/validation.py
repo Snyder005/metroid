@@ -6,6 +6,30 @@ T = TypeVar("T", str, float, list)
 
 
 def get_field_value(config: dict[str, str | float | list], name: str, dtype: type[T]) -> T:
+    """Get value from a configuration field.
+
+    Parameters
+    ----------
+    config : `dict`
+        A dictionary of configuration fields consisting of a name (`str`) and
+        value (`str`, `float`, or `list`) pair.
+    name : `str`
+        The field name.
+    dtype : type
+        A Python data type (`str`, `float`, or `list`).
+
+    Returns
+    -------
+    value : `str`, `float`, or `list`
+        The value corresponding to the field name.
+
+    Raises
+    ------
+    ValueError
+        Raised if the required field does not exist.
+    TypeError
+        Raised if the value is an invalid type.
+    """
     try:
         value = config[name]
     except KeyError:
@@ -18,13 +42,13 @@ def get_field_value(config: dict[str, str | float | list], name: str, dtype: typ
 
 
 def check_quantity(
-        quantity: u.Quantity, 
-        unit: u.Unit, 
-        vmin: float = None, 
-        vmax: float = None, 
-        inclusive_min: bool = False, 
-        inclusive_max: bool = False,
-    ) -> u.Quantity:
+    quantity: u.Quantity,
+    unit: u.Unit,
+    vmin: float = None,
+    vmax: float = None,
+    inclusive_min: bool = False,
+    inclusive_max: bool = False,
+) -> u.Quantity:
     """Perform a sequence of checks on an astropy Quantity.
 
     Parameters
