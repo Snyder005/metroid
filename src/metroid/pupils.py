@@ -11,7 +11,7 @@ from metroid.utils.validation import check_quantity, get_field_value
 class Pupil(ABC):
     """Abstract base class for telescope pupils."""
 
-    _registry = ClassVar[dict[str, type[Pupil]]] = {}
+    _registry: ClassVar[dict[str, type[Pupil]]] = {}
 
     def __init_subclass__(cls, pupil_type: str | None = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -106,7 +106,7 @@ class Pupil(ABC):
         pass
 
 
-class CircularPupil(Pupil):
+class CircularPupil(Pupil, pupil_type="circular"):
     """A circular telescope pupil."""
 
     def __init__(self, radius: u.Quantity):
@@ -137,7 +137,6 @@ class CircularPupil(Pupil):
             Raised if ``radius`` is an invalid type.
         """
         radius = get_field_value(config, "radius", float)
-
         return cls(radius * u.m)
 
     @property
@@ -178,15 +177,15 @@ class CircularPupil(Pupil):
             Raised if ``distance`` has an invalid unit or value.
         """
         distance = check_quantity(distance, u.km, vmin=100.0)
-        radius = self.outer_radius / distance
+        radius = self.radius / distance
 
-        r = radius.to_value(u.arcsec, equivalences=u.dimensionless_angles())
+        r = radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.TopHat(r)
 
         return profile
 
 
-class AnnularPupil(Pupil):
+class AnnularPupil(Pupil, pupil_type="annular"):
 
     def __init__(self, inner_radius: u.Quantity, outer_radius: u.Quantity):
         self._inner_radius = check_quantity(inner_radius, u.m, vmin=0.0)
