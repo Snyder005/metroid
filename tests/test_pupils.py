@@ -38,13 +38,17 @@ def test_circular_pupil_creation(circular_pupil):
     ],
 )
 def test_circular_pupil_creation_invalid(radius, expected_error):
-    """Test the creation of an invalid CircularPupil instance raises error."""
+    """Test that creation of a CircularPupil raises proper exception for
+    invalid cases.
+    """
     with pytest.raises(expected_error):
         CircularPupil(radius)
 
 
 def test_circular_get_profile_valid(circular_pupil):
-    """Test the get_profile method of a CircularPupil instance."""
+    """Test that get_profile method of a CircularPupil instance returns
+    correct result for valid cases.
+    """
     distance = 200.0 * u.km
     profile = circular_pupil.get_profile(distance)
 
@@ -73,13 +77,17 @@ def test_annular_pupil_creation(annular_pupil):
     ],
 )
 def test_annular_pupil_creation_invalid(inner_radius, outer_radius, expected_error):
-    """Test the creation of an invalid AnnularPupil instance raises error."""
+    """Test that creation of an AnnularPupil instance raises proper
+    exception for invalid cases.
+    """
     with pytest.raises(expected_error):
         AnnularPupil(inner_radius, outer_radius)
 
 
 def test_annular_get_profile_valid(annular_pupil):
-    """Test the get_profile method of an AnnularPupil instance."""
+    """Test that get_profile method of an AnnularPupil instance returns
+    correct result for valid cases.
+    """
     distance = 200.0 * u.km
     profile = annular_pupil.get_profile(distance)
 
@@ -107,7 +115,7 @@ def test_annular_get_profile_valid(annular_pupil):
     ],
 )
 def test_from_config(config, expected_type):
-    """Test creation of Pupil instance from configuration dictionary."""
+    """Test the creation of Pupil instance from a configuration dictionary."""
     pupil = Pupil.from_config(config)
     assert isinstance(pupil, expected_type)
 
@@ -125,6 +133,6 @@ def test_from_config(config, expected_type):
     ],
 )
 def test_get_profile_invalid(pupil, distance, expected_exception):
-    """Test that get_profile raises expected error for invalid values."""
+    """Test that get_profile raises proper exception for invalid cases."""
     with pytest.raises(expected_exception):
         pupil.get_profile(distance)

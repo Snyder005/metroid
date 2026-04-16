@@ -33,7 +33,7 @@ def test_check_quantity_valid(q, inclusive) -> None:
     ],
 )
 def test_check_quantity_invalid(q, inclusive):
-    """Test that check_quantity raises correct error for invalid cases."""
+    """Test that check_quantity raises proper exception for invalid cases."""
     with pytest.raises(ValueError):
         check_quantity(q, u.m, vmin=0.0, vmax=2.0, inclusive=inclusive)
 
@@ -52,5 +52,6 @@ def test_get_field_value_valid():
     ],
 )
 def test_get_field_value_invalid(config, key, typ, expected_exception):
+    """Test that get_field_value raises proper exception for invalid cases."""
     with pytest.raises(expected_exception):
         get_field_value(config, key, typ)
