@@ -67,11 +67,11 @@ class Camera:
 
         bandpasses = {}
 
-        plugin = "lsst" # for now default is to use rubin_sim
+        plugin = "rubin"  # for now default is to use rubin_sim
         provider = get_provider(plugin)
         bandpasses = provider.load(*bands)
 
-        return cls(pixel_scale * u.arcsec / u.pix, gain * u.electron / u.adu, bandpasses)
+        return cls(gain * u.electron / u.adu, pixel_scale * u.arcsec / u.pix, bandpasses)
 
     @property
     def gain(self) -> u.Quantity:

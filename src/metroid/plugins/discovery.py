@@ -9,4 +9,4 @@ def load_entrypoint_plugins() -> None:
 
     for ep in eps:
         provider_cls = ep.load()
-        register_provider(ep.name, provider_cls())
+        register_provider(ep.name, provider_cls)
