@@ -4,6 +4,7 @@ from metroid.plugins.registry import register_provider
 
 
 def load_entrypoint_plugins() -> None:
+    """Load bandpass entry points."""
     eps = entry_points(group="metroid.bandpass")
 
     for ep in eps:

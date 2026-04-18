@@ -2,10 +2,10 @@ from astropy import units as u
 import copy
 import os
 import typing
-from typing import Protocol
+from typing import Protocol, Self
 
 from rubin_sim.phot_utils import Bandpass
-from metroid.utils import check_quantity, get_field_value
+from metroid.utils.validation import check_quantity, get_field_value
 from metroid.plugins.registry import get_provider
 
 
@@ -13,20 +13,20 @@ class Camera:
 
     def __init__(
         self,
-        pixel_scale: u.Quantity,
         gain: u.Quantity,
-        bandpasses: dict[str, phot_utils.Bandpass],
+        pixel_scale: u.Quantity,
+        bandpasses: dict[str, Bandpass],
     ):
-        self._pixel_scale = check_quantity(pixel_scale, u.arcsec / u.pix, vmin=0.0)
         self._gain = check_quantity(gain, u.electron / u.adu, vmin=0.0)
+        self._pixel_scale = check_quantity(pixel_scale, u.arcsec / u.pix, vmin=0.0)
         self._bandpasses = {}
 
         for key, value in bandpasses.items():
             if not isinstance(key, str):
                 raise TypeError("must be 'str'")
 
-            if not isinstance(value, phot_utils.Bandpass):
-                raise TypeError("must be 'phot_utils.Bandpass")
+            if not isinstance(value, Bandpass):
+                raise TypeError("must be 'Bandpass'")
 
             self._bandpasses[key] = copy.deepcopy(value)
 
@@ -61,15 +61,15 @@ class Camera:
         TypeError
             Raised if a value is an invalid type.
         """
-        pixel_scale = get_field_value(config, "pixel_scale", float)
         gain = get_field_value(config, "gain", float)
-        bands = get_field_value(config, "bands", list)
+        pixel_scale = get_field_value(config, "pixel_scale", float)
+        bands = tuple(get_field_value(config, "bands", list))
 
         bandpasses = {}
 
-        plugin = 'lsst' # for now default is to use rubin_sim
+        plugin = "lsst" # for now default is to use rubin_sim
         provider = get_provider(plugin)
-        bandpasses = provider.load(bands)
+        bandpasses = provider.load(*bands)
 
         return cls(pixel_scale * u.arcsec / u.pix, gain * u.electron / u.adu, bandpasses)
 
@@ -88,10 +88,10 @@ class Camera:
 
     @property
     def bands(self) -> tuple[str, ...]:
-        """The camera filter bandpasses (`tuple` [`str`], read-only)."""
+        """The camera filter bandpass names (`tuple` [`str`], read-only)."""
         return tuple(self._bandpasses.keys())
 
-    def get_bandpass(self, name: str) -> phot_utils.Bandpass:
+    def get_bandpass(self, name: str) -> Bandpass:
         """Get a deep copy of a bandpass.
 
         Parameters
@@ -104,4 +104,23 @@ class Camera:
         bandpass : `rubin_sim.phot_utils.Bandpass`
             A deep copy of the corresponding bandpass.
         """
-        return copy.deepcopy(self._data[name])
+        return copy.deepcopy(self._bandpasses[name])
+
+    def get_bandpasses(self, *names: str) -> dict[str, Bandpass]:
+        """Get a deep copy of the bandpasses or a bandpass subset.
+
+        Parameters
+        ----------
+        *names : `str`
+            Camera filter bandpass names.
+
+        Returns
+        -------
+        bandpasses : `dict` [`str`, `rubin_sim.phot_utils.Bandpass`]
+            A deep copy of the bandpasses or corresponding bandpass subset.
+        """
+        if not names:
+            return copy.deepcopy(self._bandpasses)
+
+        else:
+            return {name: copy.deepcopy(self._bandpasses[name]) for name in names}

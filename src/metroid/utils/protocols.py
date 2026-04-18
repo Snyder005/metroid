@@ -1,8 +1,22 @@
 from typing import Protocol
 
-from rubin_sim.phot_utils import Bandpass #this is only for type hinting, needed?
+from rubin_sim.phot_utils import Bandpass  # this is only for type hinting, needed?
 
 
-class BandpassLoader(Protocol):
-    def load(self, band: list[str]) -> dict[str, Bandpass]:
+class BandpassProvider(Protocol):
+    """A protocol class for a bandpass provider."""
+
+    def load(self, *bands: str) -> dict[str, Bandpass]:
+        """Load bandpasses from the provider.
+
+        Parameters
+        ----------
+        *bands : `str`
+            Camera filter bandpass names.
+
+        Returns
+        -------
+        bandpasses : `dict` [str, rubin_sim.phot_utils.Bandpass]
+            A dictionary of bandpasses.
+        """
         ...

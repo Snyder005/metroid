@@ -1,13 +1,42 @@
 from metroid.utils.protocols import BandpassProvider
 
 _PROVIDERS: dict[str, BandpassProvider] = {}
+"""A registry of bandpass providers."""
 
 
 def register_provider(name: str, provider: BandpassProvider) -> None:
+    """Register a bandpass provider.
+
+    Parameters
+    ----------
+    name : `str`
+        The name of the bandpass provider.
+    provider : `metroid.utils.protocols.BandpassProvider`
+        An object implementing the BandpassProvider protocol. Must define a
+        ``load()`` method returning bandpasses.
+    """
     _PROVIDERS[name] = provider
 
 
 def get_provider(name: str) -> BandpassProvider:
+    """Get a bandpass provider.
+
+    Parameters
+    ----------
+    name : `str`
+        The name of the bandpass provider.
+
+    Returns
+    -------
+    provider : `metroid.utils.protocols.BandpassProvider`
+        An object implementing the BandpassProvider protocol. Must define a
+        ``load()`` method returning bandpasses.
+
+    Raises
+    ------
+    ValueError
+        Raised if the bandpass plugin is unknown.
+    """
     try:
         return _PROVIDERS[name]
 

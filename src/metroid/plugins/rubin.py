@@ -4,9 +4,27 @@ from rubin_sim.phot_utils import Bandpass
 from rubin_sim.data import get_data_dir
 
 
-class RubinSimBandpassReader:
+class RubinBandpassProvider:
+    """A Rubin Observatory bandpass provider."""
 
-    def load(self, bands: list[str]) -> dict[str, Bandpass]:
+    def load(self, *bands: str) -> dict[str, Bandpass]:
+        """Load Rubin Observatory bandpasses.
+
+        Parameters
+        ----------
+        *bands : `str`
+            LSST Camera filter bandpass names.
+
+        Returns
+        -------
+        bandpasses : `dict` [str, rubin_sim.phot_utils.Bandpass]
+            A dictionary of Rubin Observatory bandpasses.
+
+        Raises
+        ------
+        TypeError
+            Raised if a bandpass name is an invalid type.
+        """
         bandpasses = {}
         for band in bands:
             if not isinstance(band, str):
