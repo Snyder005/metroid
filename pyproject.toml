@@ -21,6 +21,9 @@ dependencies = [
 dev = ["black", "pytest"]
 rubin = ["rubin-sim"]
 
+[project.entry-points."metroid.bandpass"]
+rubin = "metroid.plugins.rubin:RubinBandpassLoader"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

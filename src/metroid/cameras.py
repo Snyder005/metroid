@@ -2,10 +2,11 @@ from astropy import units as u
 import copy
 import os
 import typing
+from typing import Protocol
 
-from rubin_sim import phot_utils
-from rubin_sim.data import get_data_dir
+from rubin_sim.phot_utils import Bandpass
 from metroid.utils import check_quantity, get_field_value
+from metroid.plugins.registry import get_provider
 
 
 class Camera:
@@ -65,13 +66,10 @@ class Camera:
         bands = get_field_value(config, "bands", list)
 
         bandpasses = {}
-        for band in bands:
-            if not isinstance(band, str):
-                raise TypeError("must be 'str'")
-            filename = os.path.join(get_data_dir(), "throughputs", "baseline", f"total_{band}.dat")
-            bandpass = phot_utils.Bandpass()
-            bandpass.read_throughput(filename)
-            bandpasses[band] = bandpass
+
+        plugin = 'lsst' # for now default is to use rubin_sim
+        provider = get_provider(plugin)
+        bandpasses = provider.load(bands)
 
         return cls(pixel_scale * u.arcsec / u.pix, gain * u.electron / u.adu, bandpasses)
 
