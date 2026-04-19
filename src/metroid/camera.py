@@ -8,18 +8,19 @@ import numpy as np
 from rubin_sim.phot_utils import Bandpass
 from metroid.utils.validation import check_quantity, get_field_value
 from metroid.plugins.registry import get_provider
+from metroid.utils import quantities as q
 
 
 class Camera:
 
     def __init__(
         self,
-        gain: u.Quantity,
-        pixel_scale: u.Quantity,
+        gain: q.Gain,
+        pixel_scale: q.PixelScale,
         bandpasses: dict[str, Bandpass],
     ):
-        self._gain = check_quantity(gain, u.electron / u.adu, vmin=0.0)
-        self._pixel_scale = check_quantity(pixel_scale, u.arcsec / u.pix, vmin=0.0)
+        self._gain = check_quantity(gain, "gain")
+        self._pixel_scale = check_quantity(pixel_scale, "pixel_scale")
         self._bandpasses = {}
 
         for key, value in bandpasses.items():
@@ -75,14 +76,14 @@ class Camera:
         return cls(gain * u.electron / u.adu, pixel_scale * u.arcsec / u.pix, bandpasses)
 
     @property
-    def gain(self) -> u.Quantity:
+    def gain(self) -> q.Gain:
         """The camera gain, in electrons per ADU
         (`astropy.units.Quantity`, read-only).
         """
         return self._gain.to(u.electron / u.adu)
 
     @property
-    def pixel_scale(self) -> u.Quantity:
+    def pixel_scale(self) -> q.PixelScale:
         """The pixel scale of the camera
         (`astropy.units.Quantity`, read-only)."""
         return self._pixel_scale.to(u.arcsec / u.pix)

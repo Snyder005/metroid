@@ -4,38 +4,24 @@ from astropy import units as u
 from metroid.utils.validation import check_quantity, get_field_value
 
 
-@pytest.mark.parametrize(
-    "q,inclusive",
-    [
-        (0.001 * u.km, "none"),
-        (1.0 * u.m, "none"),
-        (0.0 * u.m, "min"),
-        (2.0 * u.m, "max"),
-        (0.0 * u.m, "both"),
-        (2.0 * u.m, "both"),
-    ],
-)
-def test_check_quantity_valid(q, inclusive) -> None:
+@pytest.mark.parametrize("q", [0.010 * u.km, 10.0 * u.m])
+def test_check_quantity_valid(q):
     """Test that check_quantity returns correct result for valid cases."""
-    assert q == check_quantity(q, u.m, vmin=0.0, vmax=2.0, inclusive=inclusive)
+    assert q.to(u.m) == check_quantity(q, "geometry_length")
 
 
 @pytest.mark.parametrize(
-    "q,inclusive",
+    "q,expected_error",
     [
-        (1.0 * u.s, "none"),
-        (-0.1 * u.m, "none"),
-        (-0.1 * u.m, "min"),
-        (2.1 * u.m, "none"),
-        (2.1 * u.m, "max"),
-        (0.0 * u.m, "none"),
-        (2.0 * u.m, "none"),
+        (10.0, TypeError),
+        (10.0 * u.s, ValueError),
+        (0.0 * u.m, ValueError),
     ],
 )
-def test_check_quantity_invalid(q, inclusive):
+def test_check_quantity_invalid(q, expected_error):
     """Test that check_quantity raises proper exception for invalid cases."""
-    with pytest.raises(ValueError):
-        check_quantity(q, u.m, vmin=0.0, vmax=2.0, inclusive=inclusive)
+    with pytest.raises(expected_error):
+        check_quantity(q, "geometry_length")
 
 
 def test_get_field_value_valid():

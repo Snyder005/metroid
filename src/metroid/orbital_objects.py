@@ -5,6 +5,7 @@ import numpy as np
 import galsim
 
 from metroid.utils.validation import check_quantity
+from metroid.utils import quantities as q
 from metroid.pupils import Pupil
 
 
@@ -13,9 +14,9 @@ class OrbitalObject(ABC):
 
     def __init__(
         self,
-        height: u.Quantity,
-        zenith_angle: u.Quantity,
-        rotation_angle: u.Quantity = 90 * u.deg,
+        height: q.GeometryLength,
+        zenith_angle: q.Angle,
+        rotation_angle: q.Angle = 90 * u.deg,
         nadir_pointing: bool = False,
     ):
         self.height = height
@@ -28,36 +29,36 @@ class OrbitalObject(ABC):
             raise TypeError("must be 'bool'")
 
     @property
-    def height(self) -> u.Quantity:
+    def height(self) -> q.OrbitalDistance:
         """The orbital height of the object, in kilometers
         (`astropy.units.Quantity`).
         """
         return self._height.to(u.km)
 
     @height.setter
-    def height(self, quantity: u.Quantity) -> None:
-        self._height = check_quantity(quantity, u.km, vmin=100.0)
+    def height(self, quantity: q.OrbitalDistance) -> None:
+        self._height = check_quantity(quantity, "orbital_distance")
 
     @property
-    def zenith_angle(self) -> u.Quantity:
+    def zenith_angle(self) -> q.Angle:
         """The angle from the telescope zenith to the object, in degrees
         (`astropy.units.Quantity`).
         """
         return self._zenith_angle.to(u.deg)
 
     @zenith_angle.setter
-    def zenith_angle(self, quantity: u.Quantity) -> None:
-        self._zenith_angle = check_quantity(quantity, u.deg, vmin=0.0, vmax=90.0)
+    def zenith_angle(self, quantity: q.Angle) -> None:
+        self._zenith_angle = check_quantity(quantity, "angle")
 
     @property
-    def rotation_angle(self) -> u.Quantity:
+    def rotation_angle(self) -> q.Angle:
         """The rotation angle of the object from the horizon, in degrees
         (`astropy.units.Quantity`)."""
         return self._rotation_angle.to(u.deg)
 
     @rotation_angle.setter
-    def rotation_angle(self, quantity: u.Quantity) -> None:
-        self._rotation_angle = check_quantity(quantity, u.deg)
+    def rotation_angle(self, quantity: q.Angle) -> None:
+        self._rotation_angle = check_quantity(quantity, "angle")
 
     @property
     def nadir_pointing(self) -> bool:
@@ -71,7 +72,7 @@ class OrbitalObject(ABC):
         self._nadir_pointing = value
 
     @property
-    def nadir_angle(self) -> u.Quantity:
+    def nadir_angle(self) -> q.Angle:
         """The angle from the object nadir to the telescope, in degrees
         (`astropy.units.Quantity`, read-only).
         """
@@ -79,7 +80,7 @@ class OrbitalObject(ABC):
         return theta_n.to(u.deg)
 
     @property
-    def distance(self) -> u.Quantity:
+    def distance(self) -> q.OrbitalDistance:
         """The distance from the telescope to the object, in kilometers
         (`astropy.units.Quantity`, read-only).
         """
@@ -90,7 +91,7 @@ class OrbitalObject(ABC):
         return d.to(u.km)
 
     @property
-    def orbital_velocity(self) -> u.Quantity:
+    def orbital_velocity(self) -> q.Velocity:
         """The orbital velocity of the object, in meters per second
         (`astropy.units.Quantity`, read-only).
         """
@@ -98,7 +99,7 @@ class OrbitalObject(ABC):
         return v.to(u.m / u.s, equivalencies=u.dimensionless_angles())
 
     @property
-    def orbital_angular_velocity(self) -> u.Quantity:
+    def orbital_angular_velocity(self) -> q.AngularVelocity:
         """The orbital angular velocity of the object, in radians per second
         (`astropy.units.Quantity`, read-only).
         """
@@ -106,7 +107,7 @@ class OrbitalObject(ABC):
         return omega.to(u.rad / u.s, equivalencies=u.dimensionless_angles())
 
     @property
-    def perpendicular_velocity(self) -> u.Quantity:
+    def perpendicular_velocity(self) -> q.Velocity:
         """The velocity of the object perpendicular to the line-of-sight, in
         meters per second (`astropy.units.Quantity`, read-only).
         """
@@ -114,7 +115,7 @@ class OrbitalObject(ABC):
         return v_p.to(u.m / u.s, equivalencies=u.dimensionless_angles())
 
     @property
-    def perpendicular_angular_velocity(self) -> u.Quantity:
+    def perpendicular_angular_velocity(self) -> q.AngularVelocity:
         """The angular velocity of the object perpendicular to the
         line-of-sight, in radians per second (`astropy.units.Quantity`,
         read-only).
@@ -132,13 +133,13 @@ class OrbitalObject(ABC):
 
     @property
     @abstractmethod
-    def area(self) -> u.Quantity:
+    def area(self) -> q.Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         pass
 
-    def calculate_pixel_time(self, pixel_scale: u.Quantity) -> u.Quantity:
+    def calculate_pixel_time(self, pixel_scale: q.PixelScale) -> q.Time:
         """Calculate the pixel traversal time of the object.
 
         The pixel traversal time is defined as the time it takes for the
@@ -161,7 +162,7 @@ class OrbitalObject(ABC):
         ValueError
             Raised if ``pixel_scale`` has an invalid unit or value.
         """
-        t_p = check_quantity(pixel_scale, u.arcsec / u.pix, vmin=0.0) / self.perpendicular_angular_velocity
+        t_p = check_quantity(pixel_scale, "pixel_scale") / self.perpendicular_angular_velocity
         return t_p.to(u.s, equivalencies=[(u.pix, None)])
 
     def get_tracked_profile(self, psf: galsim.GSObject, telescope_pupil: Pupil) -> galsim.Convolution:
@@ -219,17 +220,17 @@ class CircularOrbitalObject(OrbitalObject):
 
     def __init__(
         self,
-        height: u.Quantity,
-        zenith_angle: u.Quantity,
-        radius: u.Quantity,
-        rotation_angle: u.Quantity = 90 * u.deg,
+        height: q.OrbitalDistance,
+        zenith_angle: q.Angle,
+        radius: q.GeometryLength,
+        rotation_angle: q.Angle = 90 * u.deg,
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
-        self._radius = check_quantity(radius, u.m, vmin=0.0)
+        self._radius = check_quantity(radius, "geometry_length")
 
     @property
-    def radius(self) -> u.Quantity:
+    def radius(self) -> q.GeometryLength:
         """The radius of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -250,7 +251,7 @@ class CircularOrbitalObject(OrbitalObject):
             return profile
 
     @property
-    def area(self) -> u.Quantity:
+    def area(self) -> q.Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """
@@ -263,26 +264,26 @@ class RectangularOrbitalObject(OrbitalObject):
 
     def __init__(
         self,
-        height: u.Quantity,
-        zenith_angle: u.Quantity,
-        width: u.Quantity,
-        length: u.Quantity,
-        rotation_angle: u.Quantity = 90 * u.deg,
+        height: q.OrbitalDistance,
+        zenith_angle: q.Angle,
+        width: q.GeometryLength,
+        length: q.GeometryLength,
+        rotation_angle: q.Angle = 90 * u.deg,
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
-        self._width = check_quantity(width, u.m, vmin=0.0)
-        self._length = check_quantity(length, u.m, vmin=0.0)
+        self._width = check_quantity(width, "geometry_length")
+        self._length = check_quantity(length, "geometry_length")
 
     @property
-    def width(self) -> u.Quantity:
+    def width(self) -> q.GeometryLength:
         """The width of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
         return self._width.to(u.m)
 
     @property
-    def length(self) -> u.Quantity:
+    def length(self) -> q.GeometryLength:
         """The length of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -304,7 +305,7 @@ class RectangularOrbitalObject(OrbitalObject):
             return profile
 
     @property
-    def area(self) -> u.Quantity:
+    def area(self) -> q.Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """

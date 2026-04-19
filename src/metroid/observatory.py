@@ -7,6 +7,7 @@ from rubin_sim.phot_utils import PhotometricParameters, Sed
 from metroid.camera import Camera
 from metroid.pupils import Pupil
 from metroid.utils.validation import check_quantity
+from metroid.utils import quantities as q
 
 
 class Observatory:
@@ -39,7 +40,7 @@ class Observatory:
     def location(self) -> EarthLocation:
         return self._location
 
-    def get_photo_params(self, exptime: u.Quantity) -> PhotometricParameters:
+    def get_photo_params(self, exptime: q.Time) -> PhotometricParameters:
         """Create photometric parameters for an exposure.
 
         Parameters
@@ -60,7 +61,7 @@ class Observatory:
             Raised if ``exptime`` has an invalid unit or value.
         """
         photo_params = PhotometricParameters(
-            exptime=check_quantity(exptime, u.s, vmin=0.0).to_value(u.s),
+            exptime=check_quantity(exptime, "time").to_value(u.s),
             nexp=1,
             gain=self.camera.gain.to_value(u.electron / u.adu),
             effarea=self.pupil.area.to_value(u.cm * u.cm),
@@ -69,7 +70,7 @@ class Observatory:
 
         return photo_params
 
-    def calculate_adu(self, band: str, magnitude: float, exptime: u.Quantity) -> u.Quantity:
+    def calculate_adu(self, band: str, magnitude: float, exptime: q.Time) -> q.ADU:
         # No magnitude type check for now
         bandpass = self.camera.get_bandpass(band)
         photo_params = self.get_photo_params(exptime)
@@ -84,9 +85,9 @@ class Observatory:
         self,
         band: str,
         magnitude: float,
-        exptime: u.Quantity,
-        distance: u.Quantity,
-    ) -> float:
+        exptime: q.Time,
+        distance: q.OrbitalDistance,
+    ) -> q.RadiantIntensity:
         adu = self.calculate_adu(band, magnitude, exptime)
         nphotons = (adu * self.camera.gain) / exptime
 

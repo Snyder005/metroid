@@ -2,6 +2,8 @@ from astropy import units as u
 import operator
 from typing import TypeVar, Any, Literal
 
+from metroid.utils.quantities import UNIT_REGISTRY
+
 T = TypeVar("T", str, float, list)
 
 
@@ -44,57 +46,23 @@ def get_field_value(config: dict[str, Any], name: str, dtype: type[T]) -> T:
     return value
 
 
-def check_quantity(
-    quantity: u.Quantity,
-    unit: u.Unit,
-    vmin: float = None,
-    vmax: float = None,
-    inclusive: Literal["both", "none", "min", "max"] = "none",
-) -> u.Quantity:
-    """Perform a sequence of checks on an astropy Quantity.
+def check_quantity(quantity: u.Quantity, kind: str) -> u.Quantity:
+    spec = UNIT_REGISTRY[kind]
 
-    Parameters
-    ----------
-    quantity : `astropy.units.Quantity`
-        A quantity to check.
-    unit : `astropy.units.Unit`
-        The expected unit of the quantity.
-    vmin : `float`, optional
-        The minimum limit in the expected unit (None, by default).
-    vmax : `float`, optional
-        The maximum limit in the expected unit (None, by default).
-    inclusive : {'both', 'none', 'min', 'max'}, optional
-        Specify which bounds are inclusive ('none', by default).
-
-    Returns
-    -------
-    quantity : `astropy.units.Quantity`
-        The verified quantity.
-
-    Raises
-    ------
-    TypeError
-        Raised if `quantity` is an invalid type.
-    ValueError
-        Raised if `quantity` has an invalid unit or value.
-    """
     if not isinstance(quantity, u.Quantity):
-        raise TypeError(f"must be 'astropy.units.Quantity'")
+        raise TypeError(f"{kind} must be 'astropy.units.Quantity'")
 
-    if not quantity.unit.is_equivalent(unit):
-        raise ValueError(f"{quantity.unit} not equivalent with {unit}")
+    if not any(quantity.unit.is_equivalent(unit) for unit in spec["allowed"]):
+        raise ValueError(f"invalid unit for {kind}: {quantity.unit}")
 
-    include_min = inclusive in ("both", "min")
-    include_max = inclusive in ("both", "max")
+    quantity = quantity.to(spec["canonical"])
 
-    if vmin is not None:
-        min_op, op = (operator.lt, ">=") if include_min else (operator.le, ">")
-        if min_op(quantity, vmin * unit):
-            raise ValueError(f"{quantity} must be {op} {vmin * unit}")
+    try:
+        vmin, vmax = spec["typical_range"]
+    except KeyError:
+        return quantity
 
-    if vmax is not None:
-        max_op, op = (operator.gt, "<=") if include_max else (operator.ge, "<")
-        if max_op(quantity, vmax * unit):
-            raise ValueError(f"{quantity} must be {op} {vmax * unit}")
+    if not (vmin <= quantity.value <= vmax):
+        raise ValueError(f"{kind} value {quantity.value} is outside expected range {vmin}-{vmax}")
 
     return quantity
