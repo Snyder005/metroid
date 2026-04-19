@@ -5,14 +5,10 @@ import numpy as np
 import galsim
 
 from metroid.utils.validation import check_quantity
-from metroid.observatory import Pupil
-
+from metroid.pupils import Pupil
 
 class OrbitalObject(ABC):
     """An abstract base class for orbital objects."""
-
-    nadir_pointing: bool | None = None
-    """`True` if object is nadir pointing, `False` if otherwise (`bool`)."""
 
     def __init__(
         self,
@@ -42,6 +38,17 @@ class OrbitalObject(ABC):
         self._height = check_quantity(quantity, u.km, vmin=100.0)
 
     @property
+    def zenith_angle(self) -> u.Quantity:
+        """The angle from the telescope zenith to the object, in degrees
+        (`astropy.units.Quantity`).
+        """
+        return self._zenith_angle.to(u.deg)
+
+    @zenith_angle.setter
+    def zenith_angle(self, quantity: u.Quantity) -> None:
+        self._zenith_angle = check_quantity(quantity, u.deg, vmin=0.0, vmax=90.0)
+
+    @property
     def rotation_angle(self) -> u.Quantity:
         """The rotation angle of the object from the horizon, in degrees
         (`astropy.units.Quantity`)."""
@@ -52,15 +59,15 @@ class OrbitalObject(ABC):
         self._rotation_angle = check_quantity(quantity, u.deg)
 
     @property
-    def zenith_angle(self) -> u.Quantity:
-        """The angle from the telescope zenith to the object, in degrees
-        (`astropy.units.Quantity`).
-        """
-        return self._zenith_angle.to(u.deg)
+    def nadir_pointing(self) -> bool:
+        return self._nadir_pointing
 
-    @zenith_angle.setter
-    def zenith_angle(self, quantity: u.Quantity) -> None:
-        self._zenith_angle = check_quantity(quantity, u.deg, vmin=0.0, vmax=90.0)
+    @nadir_pointing.setter
+    def nadir_pointing(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise ValueError("must be 'bool'")
+        
+        self._nadir_pointing = value
 
     @property
     def nadir_angle(self) -> u.Quantity:
@@ -179,7 +186,7 @@ class OrbitalObject(ABC):
         if not isinstance(telescope_pupil, Pupil):
             raise TypeError("must be 'metroid.Pupil'")
 
-        if not isinstance(psf, galsim.Object):
+        if not isinstance(psf, galsim.GSObject):
             raise TypeError("must be 'galsim.GSObject'")
 
         defocus = telescope_pupil.get_profile(self.distance)
@@ -214,7 +221,7 @@ class CircularOrbitalObject(OrbitalObject):
         height: u.Quantity,
         zenith_angle: u.Quantity,
         radius: u.Quantity,
-        rotation_angle: u.Quantity = 90 * u.km,
+        rotation_angle: u.Quantity = 90 * u.deg,
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
@@ -263,8 +270,8 @@ class RectangularOrbitalObject(OrbitalObject):
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
-        self._width = check_quantity(width)
-        self._length = check_quantity(length)
+        self._width = check_quantity(width, u.m, vmin=0.0)
+        self._length = check_quantity(length, u.m, vmin=0.0)
 
     @property
     def width(self) -> u.Quantity:

@@ -7,22 +7,59 @@ from metroid.pupils import Pupil, CircularPupil, AnnularPupil
 
 @pytest.fixture
 def circular_pupil():
+    """A fixture returning a CircularPupil instance."""
     return CircularPupil(4.0 * u.m)
 
 
 @pytest.fixture
 def annular_pupil():
+    """A fixture returning an AnnularPupil instance."""
     return AnnularPupil(1.0 * u.m, 4.0 * u.m)
 
 
 @pytest.fixture
 def pupil(request):
+    """A fixture factory returning a Pupil subclass instance."""
     if request.param == "circular_pupil":
         return CircularPupil(4.0 * u.m)
     elif request.param == "annular_pupil":
         return AnnularPupil(1.0 * u.m, 4.0 * u.m)
     else:
         raise ValueError(f"Unknown pupil type: {request.param}")
+
+
+@pytest.mark.parametrize(
+    "config,expected_type",
+    [
+        ({"type": "circular", "radius": 4.0}, CircularPupil),
+        ({"type": "annular", "inner_radius": 1.0, "outer_radius": 4.0}, AnnularPupil),
+    ],
+)
+def test_from_config(config, expected_type):
+    """Test the creation of Pupil subclass instance from a configuration
+    dictionary.
+    """
+    pupil = Pupil.from_config(config)
+    assert isinstance(pupil, expected_type)
+
+
+@pytest.mark.parametrize(
+    "pupil",
+    ["circular_pupil", "annular_pupil"],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "distance,expected_exception",
+    [
+        ("not a quantity", TypeError),
+        (50.0 * u.km, ValueError),
+    ],
+)
+def test_get_profile_invalid(pupil, distance, expected_exception):
+    """Test that get_profile method of a Pupil subclass instance raises proper
+    exception for invalid cases."""
+    with pytest.raises(expected_exception):
+        pupil.get_profile(distance)
 
 
 def test_circular_pupil_creation(circular_pupil):
@@ -105,34 +142,3 @@ def test_annular_get_profile_valid(annular_pupil):
     assert obj_list[0].radius == pytest.approx(expected_outer_radius)
     assert obj_list[1].original.radius == pytest.approx(expected_inner_radius)
     assert obj_list[1].flux == -((expected_inner_radius / expected_outer_radius) ** 2)
-
-
-@pytest.mark.parametrize(
-    "config,expected_type",
-    [
-        ({"type": "circular", "radius": 4.0}, CircularPupil),
-        ({"type": "annular", "inner_radius": 1.0, "outer_radius": 4.0}, AnnularPupil),
-    ],
-)
-def test_from_config(config, expected_type):
-    """Test the creation of Pupil instance from a configuration dictionary."""
-    pupil = Pupil.from_config(config)
-    assert isinstance(pupil, expected_type)
-
-
-@pytest.mark.parametrize(
-    "pupil",
-    ["circular_pupil", "annular_pupil"],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "distance,expected_exception",
-    [
-        ("not a quantity", TypeError),
-        (50.0 * u.km, ValueError),
-    ],
-)
-def test_get_profile_invalid(pupil, distance, expected_exception):
-    """Test that get_profile raises proper exception for invalid cases."""
-    with pytest.raises(expected_exception):
-        pupil.get_profile(distance)
