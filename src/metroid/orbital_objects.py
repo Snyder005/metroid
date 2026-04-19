@@ -7,6 +7,7 @@ import galsim
 from metroid.utils.validation import check_quantity
 from metroid.pupils import Pupil
 
+
 class OrbitalObject(ABC):
     """An abstract base class for orbital objects."""
 
@@ -66,7 +67,7 @@ class OrbitalObject(ABC):
     def nadir_pointing(self, value: bool) -> None:
         if not isinstance(value, bool):
             raise ValueError("must be 'bool'")
-        
+
         self._nadir_pointing = value
 
     @property

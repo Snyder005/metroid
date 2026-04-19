@@ -3,6 +3,7 @@ import copy
 import os
 import typing
 from typing import Protocol, Self
+import numpy as np
 
 from rubin_sim.phot_utils import Bandpass
 from metroid.utils.validation import check_quantity, get_field_value
@@ -63,13 +64,13 @@ class Camera:
         """
         gain = get_field_value(config, "gain", float)
         pixel_scale = get_field_value(config, "pixel_scale", float)
-        bands = tuple(get_field_value(config, "bands", list))
+        names = tuple(get_field_value(config, "bands", list))
 
         bandpasses = {}
 
         plugin = "rubin"  # for now default is to use rubin_sim
         provider = get_provider(plugin)
-        bandpasses = provider.load(*bands)
+        bandpasses = provider.load(*names)
 
         return cls(gain * u.electron / u.adu, pixel_scale * u.arcsec / u.pix, bandpasses)
 
@@ -87,7 +88,7 @@ class Camera:
         return self._pixel_scale.to(u.arcsec / u.pix)
 
     @property
-    def bands(self) -> tuple[str, ...]:
+    def band_names(self) -> tuple[str, ...]:
         """The camera filter bandpass names (`tuple` [`str`], read-only)."""
         return tuple(self._bandpasses.keys())
 
@@ -104,7 +105,12 @@ class Camera:
         bandpass : `rubin_sim.phot_utils.Bandpass`
             A deep copy of the corresponding bandpass.
         """
-        return copy.deepcopy(self._bandpasses[name])
+        try:
+            bandpass = self._bandpasses[name]
+        except KeyError:
+            raise ValueError(f"unknown bandpass name: {name}") from None
+
+        return copy.deepcopy(bandpass)
 
     def get_bandpasses(self, *names: str) -> dict[str, Bandpass]:
         """Get a deep copy of the bandpasses or a bandpass subset.
@@ -123,4 +129,22 @@ class Camera:
             return copy.deepcopy(self._bandpasses)
 
         else:
-            return {name: copy.deepcopy(self._bandpasses[name]) for name in names}
+            return {name: self.get_bandpass(name) for name in names}
+
+    def get_throughput(self, name: str) -> float:
+        """Get the summed throughput of a bandpass.
+
+        Parameters
+        ----------
+        name : `str`
+            The bandpass name.
+
+        Returns
+        -------
+        throughput : `float`
+            The summed throughput of the bandpass.
+        """
+        bandpass = self.get_bandpass(name)
+        dlambda = bandpass.wavelen[1] - bandpass.wavelen[0]
+        throughput = np.sum(bandpass.sb * dlambda / bandpass.wavelen)
+        return throughput

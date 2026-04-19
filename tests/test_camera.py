@@ -2,7 +2,7 @@ import pytest
 from astropy import units as u
 import numpy as np
 
-from metroid.cameras import Camera
+from metroid.camera import Camera
 from metroid.plugins.rubin import RubinBandpassProvider
 
 
@@ -19,7 +19,7 @@ def test_camera_creation(camera):
     """Test the creation of a Camera instance."""
     assert camera.gain == 1.5 * (u.electron / u.adu)
     assert camera.pixel_scale == 0.2 * (u.arcsec / u.pix)
-    assert camera.bands == ("u",)
+    assert camera.band_names == ("u",)
 
 
 @pytest.mark.parametrize(
@@ -47,9 +47,9 @@ def test_from_config():
     assert isinstance(camera, Camera)
 
 
-def test_get_bandpass(camera):
-    """Test that get_bandpass method of a Camera returns correct result for
-    valid cases.
+def test_get_bandpass_valid(camera):
+    """Test that get_bandpass method of a Camera instance returns correct
+    result for valid cases.
     """
     expected_bandpass = RubinBandpassProvider().load("u")["u"]
     bandpass = camera.get_bandpass("u")
@@ -58,12 +58,47 @@ def test_get_bandpass(camera):
     assert np.allclose(bandpass.sb, expected_bandpass.sb)
 
 
-def test_get_bandpasses(camera):
-    """Test that get_bandpasses method of a Camera returns correct result for
-    valid cases.
+def test_get_bandpass_invalid(camera):
+    """Test that get_bandpass method of a Camera instance raises proper
+    exception for invalid cases.
+    """
+    with pytest.raises(ValueError):
+        camera.get_bandpass("unknown")
+
+
+def test_get_bandpasses_valid(camera):
+    """Test that get_bandpasses method of a Camera instance returns correct
+    result for valid cases.
     """
     expected_bandpasses = RubinBandpassProvider().load("u")
     bandpasses = camera.get_bandpasses("u")
 
     assert np.allclose(bandpasses["u"].wavelen, expected_bandpasses["u"].wavelen)
     assert np.allclose(bandpasses["u"].sb, expected_bandpasses["u"].sb)
+
+
+def test_get_bandpasses_invalid(camera):
+    """Test that get_bandpasses method of a Camera instance raises proper
+    exception for invalid cases.
+    """
+    with pytest.raises(ValueError):
+        camera.get_bandpasses("unknown")
+
+
+def test_get_throughput_valid(camera):
+    """Test that get_throughput method of a Camera instance returns correct
+    result for valid cases.
+    """
+    bandpass = RubinBandpassProvider().load("u")["u"]
+    dlambda = bandpass.wavelen[1] - bandpass.wavelen[0]
+    expected_throughput = np.sum(bandpass.sb * dlambda / bandpass.wavelen)
+
+    assert camera.get_throughput("u") == pytest.approx(expected_throughput)
+
+
+def test_get_throughput_invalid(camera):
+    """Test that get_throughput method of a Camera instance raises proper
+    exception for invalid cases.
+    """
+    with pytest.raises(ValueError):
+        camera.get_throughput("unknown")

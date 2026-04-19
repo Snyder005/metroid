@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from astropy import units as u
 import galsim
+import numpy as np
 from typing import Self, ClassVar
 
 from metroid.utils.validation import check_quantity, get_field_value
@@ -88,6 +89,29 @@ class Pupil(ABC):
         (`astropy.units.Quantity`, read-only).
         """
         pass
+
+    def get_solid_angle(self, distance: u.Quantity) -> u.Quantity:
+        """Get the solid angle of the pupil, in steradians.
+
+        Parameters
+        ----------
+        distance : `astropy.units.Quantity`
+            The distance from the pupil, in kilometers.
+
+        Returns
+        -------
+        solid_angle : `astropy.units.Quantity`
+            The solid angle of the pupil, in steradians.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``distance`` is an invalid type.
+        ValueError
+            Raised if ``distance`` has an invalid unit or value.
+        """
+        solid_angle = self.area / check_quantity(distance, u.km, vmin=100.0) ** 2
+        return solid_angle.to(u.sr, equivalencies=u.dimensionless_angles())
 
     @abstractmethod
     def get_profile(self, distance: u.Quantity) -> galsim.GSObject:

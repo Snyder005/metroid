@@ -57,9 +57,45 @@ def test_from_config(config, expected_type):
 )
 def test_get_profile_invalid(pupil, distance, expected_exception):
     """Test that get_profile method of a Pupil subclass instance raises proper
-    exception for invalid cases."""
+    exception for invalid cases.
+    """
     with pytest.raises(expected_exception):
         pupil.get_profile(distance)
+
+
+@pytest.mark.parametrize(
+    "pupil",
+    ["circular_pupil", "annular_pupil"],
+    indirect=True,
+)
+def test_get_solid_angle_valid(pupil):
+    """Test that get_solid_angle method of a Pupil subclass instance returns
+    correct result for valid cases.
+    """
+    distance = 500.0 * u.km
+    solid_angle = pupil.get_solid_angle(distance)
+    expected_solid_angle = (pupil.area / distance**2).to(u.sr, equivalencies=u.dimensionless_angles())
+    assert solid_angle == expected_solid_angle
+
+
+@pytest.mark.parametrize(
+    "pupil",
+    ["circular_pupil", "annular_pupil"],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "distance,expected_exception",
+    [
+        ("not a quantity", TypeError),
+        (50.0 * u.km, ValueError),
+    ],
+)
+def test_get_solid_angle_invalid(pupil, distance, expected_exception):
+    """Test that get_solid_angle method of a Pupil subclass instance raises
+    proper exception for invalid cases.
+    """
+    with pytest.raises(expected_exception):
+        pupil.get_solid_angle(distance)
 
 
 def test_circular_pupil_creation(circular_pupil):
