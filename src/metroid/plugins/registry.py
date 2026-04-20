@@ -3,7 +3,7 @@ from typing import Type
 from metroid.utils.protocols import BandpassProvider
 
 _PROVIDERS: dict[str, Type[BandpassProvider]] = {}
-"""A registry of bandpass providers."""
+"""The registry of bandpass providers."""
 
 
 def register_provider(name: str, provider: Type[BandpassProvider]) -> None:

@@ -8,12 +8,14 @@ from typing import ClassVar, Self, Annotated
 
 from metroid.utils.validation import check_quantity, get_field_value
 from metroid.utils import quantities as q
+from metroid.utils.decorators import enforce_units
 
 
 class Pupil(ABC):
     """Abstract base class for telescope pupils."""
 
     _registry: ClassVar[dict[str, type[Pupil]]] = {}
+    """The registry of Pupil subclasses."""
 
     def __init_subclass__(cls, pupil_type: str | None = None, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -85,12 +87,14 @@ class Pupil(ABC):
 
     @property
     @abstractmethod
+    @enforce_units
     def area(self) -> q.Area:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         pass
 
+    @enforce_units
     def get_solid_angle(self, distance: q.OrbitalDistance) -> q.SolidAngle:
         """Get the solid angle of the pupil, in steradians.
 
@@ -111,7 +115,7 @@ class Pupil(ABC):
         ValueError
             Raised if ``distance`` has an invalid unit or value.
         """
-        solid_angle = self.area / check_quantity(distance, "orbital_distance") ** 2
+        solid_angle = self.area / distance**2
         return solid_angle.to(u.sr, equivalencies=u.dimensionless_angles())
 
     @abstractmethod
@@ -134,8 +138,9 @@ class Pupil(ABC):
 class CircularPupil(Pupil, pupil_type="circular"):
     """A circular telescope pupil."""
 
+    @enforce_units
     def __init__(self, radius: q.GeometryLength):
-        self._radius = check_quantity(radius, "geometry_length")
+        self._radius = radius
 
     @classmethod
     def _from_config(cls, config: dict[str, float]) -> Self:
@@ -165,13 +170,15 @@ class CircularPupil(Pupil, pupil_type="circular"):
         return cls(radius * u.m)
 
     @property
+    @enforce_units
     def radius(self) -> q.GeometryLength:
         """The radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
-        return self._radius.to(u.m)
+        return self._radius
 
     @property
+    @enforce_units
     def area(self) -> q.Area:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
@@ -179,8 +186,9 @@ class CircularPupil(Pupil, pupil_type="circular"):
         r = self.radius
         A = np.pi * r**2
 
-        return A.to(u.m * u.m)
+        return A
 
+    @enforce_units
     def get_profile(self, distance: q.OrbitalDistance) -> galsim.TopHat:
         """Get the surface brightness profile of the pupil.
 
@@ -201,7 +209,6 @@ class CircularPupil(Pupil, pupil_type="circular"):
         ValueError
             Raised if ``distance`` has an invalid unit or value.
         """
-        distance = check_quantity(distance, "orbital_distance")
         radius = self.radius / distance
 
         r = radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
@@ -211,10 +218,12 @@ class CircularPupil(Pupil, pupil_type="circular"):
 
 
 class AnnularPupil(Pupil, pupil_type="annular"):
+    """An annular telescope pupil."""
 
+    @enforce_units
     def __init__(self, inner_radius: q.GeometryLength, outer_radius: q.GeometryLength):
-        self._inner_radius = check_quantity(inner_radius, "geometry_length")
-        self._outer_radius = check_quantity(outer_radius, "geometry_length")
+        self._inner_radius = inner_radius
+        self._outer_radius = outer_radius
 
         if self.outer_radius <= self.inner_radius:
             raise ValueError("outer_radius must be greater than inner_radius")
@@ -244,20 +253,23 @@ class AnnularPupil(Pupil, pupil_type="annular"):
         return cls(inner_radius * u.m, outer_radius * u.m)
 
     @property
+    @enforce_units
     def inner_radius(self) -> q.GeometryLength:
         """The inner radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
-        return self._inner_radius.to(u.m)
+        return self._inner_radius
 
     @property
+    @enforce_units
     def outer_radius(self) -> q.GeometryLength:
         """The outer radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
-        return self._outer_radius.to(u.m)
+        return self._outer_radius
 
     @property
+    @enforce_units
     def area(self) -> q.Area:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
@@ -266,8 +278,9 @@ class AnnularPupil(Pupil, pupil_type="annular"):
         r_i = self.inner_radius
         A = np.pi * (r_o**2 - r_i**2)
 
-        return A.to(u.m * u.m)
+        return A
 
+    @enforce_units
     def get_profile(self, distance: q.OrbitalDistance) -> galsim.Sum:
         """Get the surface brightness profile of the pupil
 
@@ -288,7 +301,6 @@ class AnnularPupil(Pupil, pupil_type="annular"):
         ValueError
             Raised if ``distance`` has an invalid unit or value.
         """
-        distance = check_quantity(distance, "orbital_distance")
         outer_radius = self.outer_radius / distance
         inner_radius = self.inner_radius / distance
 
