@@ -2,7 +2,7 @@ from astropy import units as u
 import operator
 from typing import TypeVar, Any, Literal
 
-from metroid.utils.quantities import UNIT_REGISTRY
+from metroid.utils.quantities import QuantitySpec
 
 T = TypeVar("T", str, float, list)
 
@@ -46,23 +46,19 @@ def get_field_value(config: dict[str, Any], name: str, dtype: type[T]) -> T:
     return value
 
 
-def check_quantity(quantity: u.Quantity, kind: str) -> u.Quantity:
-    spec = UNIT_REGISTRY[kind]
+def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
 
     if not isinstance(quantity, u.Quantity):
-        raise TypeError(f"{kind} must be 'astropy.units.Quantity'")
+        raise TypeError(f"{spec.name} must be 'astropy.units.Quantity'")
 
-    if not any(quantity.unit.is_equivalent(unit) for unit in spec["allowed"]):
-        raise ValueError(f"invalid unit for {kind}: {quantity.unit}")
+    if not quantity.unit.is_equivalent(spec.default):
+        raise ValueError(f"invalid unit for {spec.name}: {quantity.unit}")
 
-    quantity = quantity.to(spec["canonical"])
+    quantity = quantity.to(spec.default)
 
-    try:
-        vmin, vmax = spec["typical_range"]
-    except KeyError:
-        return quantity
-
-    if not (vmin <= quantity.value <= vmax):
-        raise ValueError(f"{kind} value {quantity.value} is outside expected range {vmin}-{vmax}")
+    if spec.range:
+        vmin, vmax = spec.range
+        if not (vmin <= quantity.value <= vmax):
+            raise ValueError(f"{kind} value {quantity.value} is outside expected range {vmin}-{vmax}")
 
     return quantity
