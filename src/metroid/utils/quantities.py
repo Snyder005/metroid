@@ -79,12 +79,17 @@ GAIN = QuantitySpec("gain", u.electron / u.adu, typical_range=(1e-1, 1e2))
 PIXELSCALE = QuantitySpec("pixel_scale", u.arcsec / u.pix, typical_range=(1e-2, 1e1))
 """The pixel scale specification."""
 
-THROUGHPUT = QuantitySpect("throughput", u.dimensionless_unscaled)
+THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled)
+"""The throughput specification."""
 
-FLUXDENSITY = QuantitySpec("flux_density", u.erg / (u.s * u.cm**2 * u.AA))
-"""The flux density specification."""
+SPECTRALFLUXDENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
+"""The wavelength spectral flux density specification."""
 
-PHOTONFLUXDENSITY = QuantitySpec("photon_flux_density", u.electron / (u.m**2 * u.s))
+PHOTONFLUX = QuantitySpec("photon_flux", u.ph / (u.m**2 * u.s))
+"""The spectral photon flux density specification."""
+
+RADIANCE = QuantitySpec("radiance", u.W / (u.sr * u.m**2))
+"""The radiance specification."""
 
 RADIANTINTENSITY = QuantitySpec("radiant_intensity", u.W / u.sr)
 """The radiant intensity specification."""
@@ -102,5 +107,7 @@ Adu = Annotated[u.Quantity, ADU]
 Gain = Annotated[u.Quantity, GAIN]
 PixelScale = Annotated[u.Quantity, PIXELSCALE]
 Throughput = Annotated[u.Quantity, THROUGHPUT]
-FluxDensity = Annotated[u.Quantity, FLUXDENSITY]
+SpectralFluxDensity = Annotated[u.Quantity, SPECTRALFLUXDENSITY]
+PhotonFlux = Annotated[u.Quantity, PHOTONFLUX]
+Radiance = Annotated[u.Quantity, RADIANCE]
 RadiantIntensity = Annotated[u.Quantity, RADIANTINTENSITY]

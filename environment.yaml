@@ -16,3 +16,4 @@ dependencies:
   - rubin-sim
   - black
   - pytest
+  - speclite
