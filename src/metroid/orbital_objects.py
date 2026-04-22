@@ -18,7 +18,7 @@ class OrbitalObject(ABC):
         self,
         height: q.OrbitalDistance,
         zenith_angle: q.Angle,
-        rotation_angle: q.Angle = 90 * u.deg,
+        rotation_angle: q.Angle = 0.0 * u.deg,
         nadir_pointing: bool = False,
     ):
         self.height = height
@@ -122,7 +122,10 @@ class OrbitalObject(ABC):
         """The velocity of the object perpendicular to the line-of-sight, in
         meters per second (`astropy.units.Quantity`, read-only).
         """
-        v_p = self.orbital_velocity * np.cos(self.nadir_angle)
+        v = self.orbital_velocity
+        theta = self.nadir_angle
+        phi = self.rotational_angle
+        v_p = v * np.sqrt(1 - np.sin(theta) ** 2 * np.cos(phi) ** 2)
         return v_p.to(u.m / u.s, equivalencies=u.dimensionless_angles())
 
     @property
@@ -226,7 +229,7 @@ class OrbitalObject(ABC):
         mu = np.cos(self.nadir_angle)
         phi = galsim.Angle(self.rotation_angle, galsim.degrees)
 
-        return profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi) / mu
+        return profile.rotate(-phi).transform(1.0, 0.0, 0.0, mu).rotate(phi) / mu
 
 
 class CircularOrbitalObject(OrbitalObject):
