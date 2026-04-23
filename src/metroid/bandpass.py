@@ -1,18 +1,19 @@
-from typing import Any, Self
-import astropy.units as u
-import numpy as np
+from typing import Any, Self, TYPE_CHECKING
 
+import astropy.units as u
 from speclite.filters import FilterResponse, load_filter, load_filters
-from metroid.utils.decorators import enforce_units
-from metroid.utils import quantities as q
+
 from metroid.sed import Sed
+from metroid.photo_params import PhotometricParameters
+from metroid.utils.decorators import enforce_units
+from metroid.utils.quantities import Adu, PhotonFlux, Throughput, Wavelength
 
 
 class Bandpass:
     """A throughput curve for a filter band."""
 
     @enforce_units
-    def __init__(self, wavelength: q.Wavelength, throughput: q.Throughput, meta: dict[str, Any]):
+    def __init__(self, wavelength: Wavelength, throughput: Throughput, meta: dict[str, Any]):
         self._fr = FilterResponse(wavelength.value, throughput.value, meta)
 
     @classmethod
@@ -67,7 +68,7 @@ class Bandpass:
 
     @property
     @enforce_units
-    def wavelength(self) -> q.Wavelength:
+    def wavelength(self) -> Wavelength:
         """The wavelength array in units of Angstrom
         (`astropy.units.Quantity`).
         """
@@ -75,7 +76,7 @@ class Bandpass:
 
     @property
     @enforce_units
-    def throughput(self) -> q.Throughput:
+    def throughput(self) -> Throughput:
         """The throughput array in dimensionless units
         (`astropy.units.Quantity`).
         """
@@ -83,58 +84,59 @@ class Bandpass:
 
     @property
     @enforce_units
-    def effective_wavelength(self) -> q.Wavelength:
+    def effective_wavelength(self) -> Wavelength:
         """The effective wavelength of the bandpass."""
         return self._fr.effective_wavelength
 
     @property
     @enforce_units
-    def ab_zeropoint(self) -> q.PhotonFlux:
-        """The AB magnitude zeropoint in units of photons per second per
-        square meter.
-        """
+    def ab_zeropoint(self) -> PhotonFlux:
+        """The AB zeropoint in units of photons per second per square meter."""
         return self._fr.ab_zeropoint * u.ph
 
     @enforce_units
-    def calculate_ab_flux(self, magnitude: float) -> q.PhotonFlux:
+    def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux:
         """Calculate the photon flux corresponding to the magnitude.
 
         Parameters
         ----------
-        magnitude : `float`
+        brightness_spec : `float` or `metroid.sed.Sed`
+            The brightness specification. Can be either an AB
+            magnitude or the SED of an observed object.
 
         Returns
         -------
         photon_flux : `astropy.units.Quantity`
-            The photon flux for the given magnitude in units of photons per
-            second per square meter.
+            The photon flux in units of photons per second per square meter.
 
+        Raises
+        ------
+        TypeError
+            Raised if ``brightness_spec`` is invalid type:
         """
-        return self.ab_zeropoint * 10 ** (-magnitude / 2.5)
+        if isinstance(brightness_spec, float):
+            return self.ab_zeropoint * 10 ** (-brightness_spec / 2.5)
+
+        elif isinstance(brightness_spec, Sed):
+            flux = self._fr.convolve_with_array(
+                brightness_spec.wavelength.value,
+                brightness_spec.flambda,
+                photon_weighted=True,
+                interpolate=True,
+                units=brightness_spec.flambda.unit,
+            )
+            return flux * u.ph
+
+        else:
+            raise TypeError("unsupported brightness specification type")
 
     @enforce_units
-    def calculate_flux(self, sed: Sed) -> q.PhotonFlux:
-        """Calculate the photon flux from an object given its SED.
+    def calculate_adu(self, brightness_spec: str | Sed, photo_params: PhotometricParameters) -> Adu:
+        if not isinstance(photo_params, PhotometricParameters):
+            raise TypeError("must be 'metroid.photo_params.PhotometricParameters'")
 
-        Parameters
-        ----------
-        sed : `metroid.sed.Sed`
-            The object's SED.
-
-        Returns
-        -------
-        photon_flux : `astropy.units.Quantity`
-            The photon flux from the object in units of photons per second per
-            square meter.
-        """
-        flux = self._fr.convolve_with_array(
-            sed.wavelength.value, 
-            sed.flambda,
-            photon_weighted=True)
-            interpolate=True,
-            units=sed.flambda.units,
-        )
-        return flux * u.ph
+        photon_flux = self.calculate_photon_flux(brightness_spec)
+        return photon_flux * photo_params.exptime * photo_params.qe * photo_params.area / photo_params.gain
 
     @enforce_units
     def calculate_ab_magnitude(self, sed: Sed) -> float:
@@ -150,4 +152,4 @@ class Bandpass:
         magnitude : `float`
             The AB magnitude of the object.
         """
-        return self_fr.get_ab_magnitude(sed.flambda, sed.wavelength)
+        return self._fr.get_ab_magnitude(sed.flambda, sed.wavelength)

@@ -1,13 +1,14 @@
-from astropy import units as u
+import astropy.units as u
 from astropy.coordinates import EarthLocation
 from astropy.constants import h, c
 import numpy as np
 
-from rubin_sim.phot_utils import PhotometricParameters, Sed
 from metroid.camera import Camera
 from metroid.pupils import Pupil
-from metroid.utils import quantities as q
+from metroid.sed import Sed
+from metroid.photo_params import PhotometricParameters
 from metroid.utils.decorators import enforce_units
+from metroid.utils.quantities import Time, Adu
 
 
 class Observatory:
@@ -29,6 +30,13 @@ class Observatory:
         else:
             raise ValueError("must be 'EarthLocation'")
 
+        self._photo_params = PhotometricParameters(
+            self.camera.exptime,
+            self.camera.gain,
+            self.pupil.area,
+            qe=self.camera.qe,
+        )
+
     @property
     def camera(self) -> Camera:
         """The observatory camera (`metroid.camera.Camera`)."""
@@ -46,8 +54,9 @@ class Observatory:
         """
         return self._location
 
+    @property
     @enforce_units
-    def get_photo_params(self, exptime: q.Time) -> PhotometricParameters:
+    def photo_params(self) -> PhotometricParameters:
         """Create photometric parameters for an exposure.
 
         Parameters
@@ -57,7 +66,7 @@ class Observatory:
 
         Returns
         -------
-        photo_params : `rubin_sim.phot_utils.PhotometricParameters`
+        photo_params : `metroid.photo_params.PhotometricParameters`
             The photometric parameters for the exposure.
 
         Raises
@@ -67,42 +76,12 @@ class Observatory:
         ValueError
             Raised if ``exptime`` has an invalid unit or value.
         """
-        photo_params = PhotometricParameters(
-            exptime=exptime.to_value(u.s),
-            nexp=1,
-            gain=self.camera.gain.to_value(u.electron / u.adu),
-            effarea=self.pupil.area.to_value(u.cm * u.cm),
-            platescale=self.camera.pixel_scale.to_value(u.arcsec / u.pix),
-        )
-
-        return photo_params
+        return self._photo_params
 
     @enforce_units
-    def calculate_adu(self, band: str, magnitude: float, exptime: q.Time) -> q.Adu:
-        # No magnitude type check for now
-        bandpass = self.camera.get_bandpass(band)
-        photo_params = self.get_photo_params(exptime)
+    def calculate_adu(self, name: str, brightness_spec: str | Sed) -> Adu:
+        bandpass = self.camera.get_bandpass(name)
+        return bandpass.calculate_adu(brightness_spec, self.photo_params)
 
-        sed = Sed()
-        sed.set_flat_sed()
-        m0_adu = sed.calc_adu(bandpass, phot_params=photo_params) * u.adu
-        return m0_adu * 10.0 ** (-magnitude / 2.5)
-
-    @enforce_units
-    def calculate_radiant_intensity(
-        self,
-        band: str,
-        magnitude: float,
-        exptime: q.Time,
-        distance: q.OrbitalDistance,
-    ) -> q.RadiantIntensity:
-        adu = self.calculate_adu(band, magnitude, exptime)
-        nphotons = (adu * self.camera.gain) / exptime
-
-        bandpass = self.camera.get_bandpass(band)
-        lambda0 = bandpass.calc_eff_wavelen()[0] * u.nm  # Make a method of Bandpass
-        power = (nphotons * h * c / lambda0).to(u.W, equivalencies=[(u.electron, None)])
-
-        throughput = self.camera.get_throughput(band)  # Make a method of Bandpass
-        solid_angle = self.pupil.get_solid_angle(distance)
-        return power / throughput / solid_angle
+    def calculate_adus(self, brightness_spec: str | Sed) -> dict[str, Adu]:
+        return {name: self.calculate_adu(name, brightness_spec) for name in camera.band_names}

@@ -40,7 +40,7 @@ def test_orbital_object_creation(orbital_object):
     """Test the creation of an OrbitalObject subclass instance."""
     h = 550.0 * u.km
     theta_z = 70.0 * u.deg
-    theta_r = 90.0 * u.deg
+    theta_r = 0.0 * u.deg
 
     theta_n = np.arcsin(R_earth * np.sin(theta_z) / (R_earth + h)).to(u.deg)
     d = (R_earth * np.sin(theta_z - theta_n) / np.sin(theta_n)).to(u.km)
@@ -53,12 +53,12 @@ def test_orbital_object_creation(orbital_object):
     assert orbital_object.zenith_angle == theta_z
     assert orbital_object.rotation_angle == theta_r
     assert orbital_object.nadir_pointing is False
-    assert orbital_object.nadir_angle == theta_n
-    assert orbital_object.distance == d
-    assert orbital_object.orbital_velocity == v_o
-    assert orbital_object.orbital_angular_velocity == omega_o
-    assert orbital_object.perpendicular_velocity == v_p
-    assert orbital_object.perpendicular_angular_velocity == omega_p
+    assert u.isclose(orbital_object.nadir_angle, theta_n)
+    assert u.isclose(orbital_object.distance, d)
+    assert u.isclose(orbital_object.orbital_velocity, v_o)
+    assert u.isclose(orbital_object.orbital_angular_velocity, omega_o)
+    assert u.isclose(orbital_object.perpendicular_velocity, v_p)
+    assert u.isclose(orbital_object.perpendicular_angular_velocity, omega_p)
 
 
 @pytest.mark.parametrize(

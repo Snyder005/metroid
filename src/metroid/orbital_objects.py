@@ -1,13 +1,22 @@
 from abc import ABC, abstractmethod
-from astropy import units as u
+
+import astropy.units as u
 from astropy.constants import G, R_earth, M_earth
 import numpy as np
-import galsim
 
-from metroid.utils.validation import check_quantity
-from metroid.utils.decorators import enforce_units
-from metroid.utils import quantities as q
+import galsim
 from metroid.pupils import Pupil
+from metroid.utils.decorators import enforce_units
+from metroid.utils.quantities import (
+    Angle,
+    AngularVelocity,
+    Area,
+    GeometryLength,
+    OrbitalDistance,
+    PixelScale,
+    Time,
+    Velocity,
+)
 
 
 class OrbitalObject(ABC):
@@ -16,9 +25,9 @@ class OrbitalObject(ABC):
     @enforce_units
     def __init__(
         self,
-        height: q.OrbitalDistance,
-        zenith_angle: q.Angle,
-        rotation_angle: q.Angle = 0.0 * u.deg,
+        height: OrbitalDistance,
+        zenith_angle: Angle,
+        rotation_angle: Angle = 0.0 * u.deg,
         nadir_pointing: bool = False,
     ):
         self.height = height
@@ -32,7 +41,7 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def height(self) -> q.OrbitalDistance:
+    def height(self) -> OrbitalDistance:
         """The orbital height of the object, in kilometers
         (`astropy.units.Quantity`).
         """
@@ -40,12 +49,12 @@ class OrbitalObject(ABC):
 
     @height.setter
     @enforce_units
-    def height(self, quantity: q.OrbitalDistance) -> None:
+    def height(self, quantity: OrbitalDistance) -> None:
         self._height = quantity
 
     @property
     @enforce_units
-    def zenith_angle(self) -> q.Angle:
+    def zenith_angle(self) -> Angle:
         """The angle from the telescope zenith to the object, in degrees
         (`astropy.units.Quantity`).
         """
@@ -53,19 +62,19 @@ class OrbitalObject(ABC):
 
     @zenith_angle.setter
     @enforce_units
-    def zenith_angle(self, quantity: q.Angle) -> None:
+    def zenith_angle(self, quantity: Angle) -> None:
         self._zenith_angle = quantity
 
     @property
     @enforce_units
-    def rotation_angle(self) -> q.Angle:
+    def rotation_angle(self) -> Angle:
         """The rotation angle of the object from the horizon, in degrees
         (`astropy.units.Quantity`)."""
         return self._rotation_angle
 
     @rotation_angle.setter
     @enforce_units
-    def rotation_angle(self, quantity: q.Angle) -> None:
+    def rotation_angle(self, quantity: Angle) -> None:
         self._rotation_angle = quantity
 
     @property
@@ -81,7 +90,7 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def nadir_angle(self) -> q.Angle:
+    def nadir_angle(self) -> Angle:
         """The angle from the object nadir to the telescope, in degrees
         (`astropy.units.Quantity`, read-only).
         """
@@ -89,7 +98,7 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def distance(self) -> q.OrbitalDistance:
+    def distance(self) -> OrbitalDistance:
         """The distance from the telescope to the object, in kilometers
         (`astropy.units.Quantity`, read-only).
         """
@@ -100,7 +109,7 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def orbital_velocity(self) -> q.Velocity:
+    def orbital_velocity(self) -> Velocity:
         """The orbital velocity of the object, in meters per second
         (`astropy.units.Quantity`, read-only).
         """
@@ -109,7 +118,7 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def orbital_angular_velocity(self) -> q.AngularVelocity:
+    def orbital_angular_velocity(self) -> AngularVelocity:
         """The orbital angular velocity of the object, in radians per second
         (`astropy.units.Quantity`, read-only).
         """
@@ -118,19 +127,19 @@ class OrbitalObject(ABC):
 
     @property
     @enforce_units
-    def perpendicular_velocity(self) -> q.Velocity:
+    def perpendicular_velocity(self) -> Velocity:
         """The velocity of the object perpendicular to the line-of-sight, in
         meters per second (`astropy.units.Quantity`, read-only).
         """
         v = self.orbital_velocity
         theta = self.nadir_angle
-        phi = self.rotational_angle
+        phi = self.rotation_angle
         v_p = v * np.sqrt(1 - np.sin(theta) ** 2 * np.cos(phi) ** 2)
         return v_p.to(u.m / u.s, equivalencies=u.dimensionless_angles())
 
     @property
     @enforce_units
-    def perpendicular_angular_velocity(self) -> q.AngularVelocity:
+    def perpendicular_angular_velocity(self) -> AngularVelocity:
         """The angular velocity of the object perpendicular to the
         line-of-sight, in radians per second (`astropy.units.Quantity`,
         read-only).
@@ -149,14 +158,14 @@ class OrbitalObject(ABC):
     @property
     @abstractmethod
     @enforce_units
-    def area(self) -> q.Area:
+    def area(self) -> Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         pass
 
     @enforce_units
-    def calculate_pixel_time(self, pixel_scale: q.PixelScale) -> q.Time:
+    def calculate_pixel_time(self, pixel_scale: PixelScale) -> Time:
         """Calculate the pixel traversal time of the object.
 
         The pixel traversal time is defined as the time it takes for the
@@ -238,10 +247,10 @@ class CircularOrbitalObject(OrbitalObject):
     @enforce_units
     def __init__(
         self,
-        height: q.OrbitalDistance,
-        zenith_angle: q.Angle,
-        radius: q.GeometryLength,
-        rotation_angle: q.Angle = 90 * u.deg,
+        height: OrbitalDistance,
+        zenith_angle: Angle,
+        radius: GeometryLength,
+        rotation_angle: Angle = 0.0 * u.deg,
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
@@ -249,7 +258,7 @@ class CircularOrbitalObject(OrbitalObject):
 
     @property
     @enforce_units
-    def radius(self) -> q.GeometryLength:
+    def radius(self) -> GeometryLength:
         """The radius of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -271,7 +280,7 @@ class CircularOrbitalObject(OrbitalObject):
 
     @property
     @enforce_units
-    def area(self) -> q.Area:
+    def area(self) -> Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """
@@ -283,11 +292,11 @@ class RectangularOrbitalObject(OrbitalObject):
 
     def __init__(
         self,
-        height: q.OrbitalDistance,
-        zenith_angle: q.Angle,
-        width: q.GeometryLength,
-        length: q.GeometryLength,
-        rotation_angle: q.Angle = 90 * u.deg,
+        height: OrbitalDistance,
+        zenith_angle: Angle,
+        width: GeometryLength,
+        length: GeometryLength,
+        rotation_angle: Angle = 0.0 * u.deg,
         nadir_pointing: bool = False,
     ):
         super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
@@ -296,7 +305,7 @@ class RectangularOrbitalObject(OrbitalObject):
 
     @property
     @enforce_units
-    def width(self) -> q.GeometryLength:
+    def width(self) -> GeometryLength:
         """The width of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -304,7 +313,7 @@ class RectangularOrbitalObject(OrbitalObject):
 
     @property
     @enforce_units
-    def length(self) -> q.GeometryLength:
+    def length(self) -> GeometryLength:
         """The length of the object, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -327,7 +336,7 @@ class RectangularOrbitalObject(OrbitalObject):
 
     @property
     @enforce_units
-    def area(self) -> q.Area:
+    def area(self) -> Area:
         """The surface area of the object, in square meters
         (`astropy.units.Quantity`, read-only).
         """

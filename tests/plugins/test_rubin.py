@@ -1,4 +1,4 @@
-from rubin_sim.phot_utils import Bandpass
+from metroid.bandpass import Bandpass
 from metroid.plugins.rubin import RubinBandpassProvider
 
 

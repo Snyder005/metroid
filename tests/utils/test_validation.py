@@ -1,28 +1,7 @@
 import pytest
 from astropy import units as u
 
-from metroid.utils.validation import check_quantity, get_field_value
-from metroid.utils.quantities import GEOMETRYLENGTH
-
-
-@pytest.mark.parametrize("q", [0.010 * u.km, 10.0 * u.m])
-def test_check_quantity_valid(q):
-    """Test that check_quantity returns correct result for valid cases."""
-    assert q.to(u.m) == check_quantity(q, GEOMETRYLENGTH)
-
-
-@pytest.mark.parametrize(
-    "q,expected_error",
-    [
-        (10.0, TypeError),
-        (10.0 * u.s, ValueError),
-        (0.0 * u.m, ValueError),
-    ],
-)
-def test_check_quantity_invalid(q, expected_error):
-    """Test that check_quantity raises proper exception for invalid cases."""
-    with pytest.raises(expected_error):
-        check_quantity(q, GEOMETRYLENGTH)
+from metroid.utils.validation import get_field_value
 
 
 def test_get_field_value_valid():

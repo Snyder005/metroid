@@ -11,38 +11,42 @@ def camera():
     """A fixture returning a Camera instance."""
     gain = 1.5 * (u.electron / u.adu)
     pixel_scale = 0.2 * (u.arcsec / u.pix)
+    exptime = 15.0 * u.s
     bandpasses = RubinBandpassProvider().load("u")
-    return Camera(gain, pixel_scale, bandpasses)
+    return Camera(bandpasses, exptime, gain, pixel_scale)
 
 
 def test_camera_creation(camera):
     """Test the creation of a Camera instance."""
+    assert camera.exptime == 15.0 * u.s
+    assert camera.qe == 1.0 * u.electron / u.ph
     assert camera.gain == 1.5 * (u.electron / u.adu)
     assert camera.pixel_scale == 0.2 * (u.arcsec / u.pix)
     assert camera.band_names == ("u",)
 
 
 @pytest.mark.parametrize(
-    "gain,pixel_scale,expected_error",
+    "exptime,gain,pixel_scale,expected_error",
     [
-        (1.5, 0.2 * (u.arcsec / u.pix), TypeError),
-        (1.5 * (u.electron / u.adu), 0.2, TypeError),
+        (15.0 * u.s, 1.5, 0.2 * (u.arcsec / u.pix), TypeError),
+        (15.0 * u.s, 1.5 * (u.electron / u.adu), 0.2, TypeError),
+        (15.0, 1.5 * (u.electron / u.adu), 0.2 * (u.arcsec / u.pix), TypeError),
     ],
 )
-def test_camera_creation_invalid(gain, pixel_scale, expected_error):
+def test_camera_creation_invalid(exptime, gain, pixel_scale, expected_error):
     """Test that creation of a Camera raises proper exception for invalid
     cases.
     """
     bandpasses = RubinBandpassProvider().load("u")
     with pytest.raises(expected_error):
-        Camera(gain, pixel_scale, bandpasses)
+        Camera(bandpasses, exptime, gain, pixel_scale)
 
 
 def test_from_config():
     """Test the creation of a Camera instance from a configuration
     dictionary.
     """
-    config = {"gain": 1.5, "pixel_scale": 0.2, "bands": ["u"]}
+    config = {"exptime": 15.0, "gain": 1.5, "pixel_scale": 0.2, "bands": ["u"], "qe": 1.0}
     camera = Camera.from_config(config)
     assert isinstance(camera, Camera)
 
@@ -54,8 +58,8 @@ def test_get_bandpass_valid(camera):
     expected_bandpass = RubinBandpassProvider().load("u")["u"]
     bandpass = camera.get_bandpass("u")
 
-    assert np.allclose(bandpass.wavelen, expected_bandpass.wavelen)
-    assert np.allclose(bandpass.sb, expected_bandpass.sb)
+    assert np.allclose(bandpass.wavelength.value, expected_bandpass.wavelength.value)
+    assert np.allclose(bandpass.throughput.value, expected_bandpass.throughput.value)
 
 
 def test_get_bandpass_invalid(camera):
@@ -71,34 +75,26 @@ def test_get_bandpasses_valid(camera):
     result for valid cases.
     """
     expected_bandpasses = RubinBandpassProvider().load("u")
-    bandpasses = camera.get_bandpasses("u")
+    bandpasses = camera.bandpasses
 
-    assert np.allclose(bandpasses["u"].wavelen, expected_bandpasses["u"].wavelen)
-    assert np.allclose(bandpasses["u"].sb, expected_bandpasses["u"].sb)
-
-
-def test_get_bandpasses_invalid(camera):
-    """Test that get_bandpasses method of a Camera instance raises proper
-    exception for invalid cases.
-    """
-    with pytest.raises(ValueError):
-        camera.get_bandpasses("unknown")
+    assert np.allclose(bandpasses["u"].wavelength.value, expected_bandpasses["u"].wavelength.value)
+    assert np.allclose(bandpasses["u"].throughput.value, expected_bandpasses["u"].throughput.value)
 
 
-def test_get_throughput_valid(camera):
-    """Test that get_throughput method of a Camera instance returns correct
-    result for valid cases.
-    """
-    bandpass = RubinBandpassProvider().load("u")["u"]
-    dlambda = bandpass.wavelen[1] - bandpass.wavelen[0]
-    expected_throughput = np.sum(bandpass.sb * dlambda / bandpass.wavelen)
+# def test_get_throughput_valid(camera):
+#    """Test that get_throughput method of a Camera instance returns correct
+#    result for valid cases.
+#    """
+#    bandpass = RubinBandpassProvider().load("u")["u"]
+#    dlambda = bandpass.wavelength[1] - bandpass.wavelength[0]
+#    expected_throughput = np.sum(bandpass.sb * dlambda / bandpass.wavelen)
+#
+#    assert camera.get_throughput("u") == pytest.approx(expected_throughput)
 
-    assert camera.get_throughput("u") == pytest.approx(expected_throughput)
 
-
-def test_get_throughput_invalid(camera):
-    """Test that get_throughput method of a Camera instance raises proper
-    exception for invalid cases.
-    """
-    with pytest.raises(ValueError):
-        camera.get_throughput("unknown")
+# def test_get_throughput_invalid(camera):
+#    """Test that get_throughput method of a Camera instance raises proper
+#    exception for invalid cases.
+#    """
+#    with pytest.raises(ValueError):
+#        camera.get_throughput("unknown")

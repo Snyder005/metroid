@@ -37,11 +37,15 @@ def test_load_filter():
     assert isinstance(Bandpass.load_filter("lsst2023-g"), Bandpass)
 
 
-def test_calculate_photon_flux(bandpass):
+@pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])
+def test_calculate_photon_flux(bandpass, brightness_spec):
     """Test that calculate_photon_flux returns correct result for valid
     inputs.
     """
-    expected_photon_flux = (bandpass._fr.ab_zeropoint * (10 ** (-5.0 / 2.5))) * u.ph
-    photon_flux = bandpass.calculate_photon_flux(5.0)
+    assert u.isclose(bandpass.calculate_photon_flux(brightness_spec), bandpass.ab_zeropoint)
 
-    assert u.isclose(photon_flux, expected_photon_flux)
+
+def test_calculate_ab_magnitude(bandpass):
+    sed = Sed.for_ab_magnitudes()
+
+    assert np.isclose(bandpass.calculate_ab_magnitude(sed), 0.0)

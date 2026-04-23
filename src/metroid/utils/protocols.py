@@ -1,12 +1,16 @@
-from typing import Protocol
+from __future__ import annotations
 
-from rubin_sim.phot_utils import Bandpass  # this is only for type hinting, needed?
+from typing import Protocol, TYPE_CHECKING
+from collections.abc import Mapping
+
+if TYPE_CHECKING:
+    from metroid.bandpass import Bandpass
 
 
 class BandpassProvider(Protocol):
     """A protocol class for a bandpass provider."""
 
-    def load(self, *bands: str) -> dict[str, Bandpass]:
+    def load(self, *bands: str) -> Mapping[str, Bandpass]:
         """Load bandpasses from the provider.
 
         Parameters

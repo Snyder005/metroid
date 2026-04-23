@@ -1,17 +1,18 @@
 from typing import Self
+
 from astropy import units as u
 from astropy.constants import c
 import numpy as np
 
-from metroid.utils import quantities as q
 from metroid.utils.decorators import enforce_units
+from metroid.utils.quantities import Wavelength, SpectralFluxDensity
 
 
 class Sed:
     """A spectral energy distribution function."""
 
     @enforce_units
-    def __init__(self, wavelength: q.Wavelength, flambda: q.SpectralFluxDensity):
+    def __init__(self, wavelength: Wavelength, flambda: SpectralFluxDensity):
         self._wavelength = wavelength
         self._flambda = flambda
 
@@ -41,7 +42,7 @@ class Sed:
 
     @property
     @enforce_units
-    def wavelength(self) -> q.Wavelength:
+    def wavelength(self) -> Wavelength:
         """The SED wavelength array in units of Angstrom
         (`astropy.units.Quantity`).
         """
@@ -49,7 +50,7 @@ class Sed:
 
     @property
     @enforce_units
-    def flambda(self) -> q.SpectralFluxDensity:
+    def flambda(self) -> SpectralFluxDensity:
         """The SED flux density array in ergs per second per square meters per
         Angstrom (`astropy.units.Quantity`).
         """

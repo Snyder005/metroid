@@ -1,5 +1,7 @@
 from typing import Annotated, Any, Union, get_args, get_origin
-from astropy import units as u
+
+import astropy.units as u
+import numpy as np
 
 
 class QuantitySpec:
@@ -11,7 +13,46 @@ class QuantitySpec:
         self.typical_range = typical_range
 
 
-def extract_spec(annotation: Any) -> QuantitySpec | None:
+def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
+    """Check that quantity has valid units and value.
+
+    Parameters
+    ----------
+    quantity : `astropy.units.Quantity`
+        The quantity to check.
+    spec : `metroid.utils.quantities.QuantitySpec`
+        The quantity specification.
+
+    Returns
+    -------
+    quantity : `astropy.units.Quantity`
+        The quantity in the specified default units.
+    """
+    if not isinstance(spec, QuantitySpec):
+        raise TypeError(f"{spec} must be 'metroid.utils.quantities.QuantitySpec'")
+
+    if not isinstance(quantity, u.Quantity):
+        raise TypeError(f"{spec.name} must be 'astropy.units.Quantity'")
+
+    if not quantity.unit.is_equivalent(spec.default):
+        raise ValueError(f"invalid unit for {spec.name}: {quantity.unit}")
+
+    quantity = quantity.to(spec.default)
+    if spec.typical_range is not None:
+        value = quantity.value
+        vmin, vmax = spec.typical_range
+        if np.isscalar(value):
+            if not (vmin <= value <= vmax):
+                raise ValueError(f"{spec.name} value {value} is outside range {vmin}-{vmax}")
+
+        else:
+            if not np.all((value >= vmin) & (value <= vmax)):
+                raise ValueError(f"{spec.name} contains values outside range {vmin}-{vmax}")
+
+    return quantity
+
+
+def _extract_spec(annotation: Any) -> QuantitySpec | None:
     """Extract the quantity specification from a type hint.
 
     Parameters
@@ -36,7 +77,7 @@ def extract_spec(annotation: Any) -> QuantitySpec | None:
 
     if origin is Union:
         for arg in get_args(annotation):
-            spec = extract_spec(arg)
+            spec = _extract_spec(arg)
             if spec:
                 return spec
 
@@ -46,10 +87,10 @@ def extract_spec(annotation: Any) -> QuantitySpec | None:
 WAVELENGTH = QuantitySpec("wavelength", u.AA)
 """The wavelength specification."""
 
-GEOMETRYLENGTH = QuantitySpec("geometry_length", u.m, typical_range=(1e-3, 1e3))
+GEOMETRY_LENGTH = QuantitySpec("geometry_length", u.m, typical_range=(1e-3, 1e3))
 """The geometry length specification."""
 
-ORBITALDISTANCE = QuantitySpec("orbital_distance", u.km, typical_range=(1e2, 1e6))
+ORBITAL_DISTANCE = QuantitySpec("orbital_distance", u.km, typical_range=(1e2, 1e6))
 """The orbital distance specification."""
 
 AREA = QuantitySpec("area", u.m**2, typical_range=(1e-6, 1e6))
@@ -64,10 +105,10 @@ VELOCITY = QuantitySpec("velocity", u.m / u.s)
 ANGLE = QuantitySpec("angle", u.deg)
 """The angle specification."""
 
-SOLIDANGLE = QuantitySpec("solid_angle", u.sr)
+SOLID_ANGLE = QuantitySpec("solid_angle", u.sr)
 """The solid angle specification."""
 
-ANGULARVELOCITY = QuantitySpec("angular_velocity", u.rad / u.s)
+ANGULAR_VELOCITY = QuantitySpec("angular_velocity", u.rad / u.s)
 """The angular velocity specification."""
 
 ADU = QuantitySpec("adu", u.adu)
@@ -76,38 +117,42 @@ ADU = QuantitySpec("adu", u.adu)
 GAIN = QuantitySpec("gain", u.electron / u.adu, typical_range=(1e-1, 1e2))
 """The gain specification."""
 
-PIXELSCALE = QuantitySpec("pixel_scale", u.arcsec / u.pix, typical_range=(1e-2, 1e1))
+QUANTUM_EFFICIENCY = QuantitySpec("qe", u.electron / u.ph, typical_range=(1e0, 1e2))
+"""The quantum efficiency specification."""
+
+PIXEL_SCALE = QuantitySpec("pixel_scale", u.arcsec / u.pix, typical_range=(1e-2, 1e1))
 """The pixel scale specification."""
 
 THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled)
 """The throughput specification."""
 
-SPECTRALFLUXDENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
+SPECTRAL_FLUX_DENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
 """The wavelength spectral flux density specification."""
 
-PHOTONFLUX = QuantitySpec("photon_flux", u.ph / (u.m**2 * u.s))
+PHOTON_FLUX = QuantitySpec("photon_flux", u.ph / (u.m**2 * u.s))
 """The spectral photon flux density specification."""
 
 RADIANCE = QuantitySpec("radiance", u.W / (u.sr * u.m**2))
 """The radiance specification."""
 
-RADIANTINTENSITY = QuantitySpec("radiant_intensity", u.W / u.sr)
+RADIANT_INTENSITY = QuantitySpec("radiant_intensity", u.W / u.sr)
 """The radiant intensity specification."""
 
 Wavelength = Annotated[u.Quantity, WAVELENGTH]
-GeometryLength = Annotated[u.Quantity, GEOMETRYLENGTH]
-OrbitalDistance = Annotated[u.Quantity, ORBITALDISTANCE]
+GeometryLength = Annotated[u.Quantity, GEOMETRY_LENGTH]
+OrbitalDistance = Annotated[u.Quantity, ORBITAL_DISTANCE]
 Area = Annotated[u.Quantity, AREA]
 Time = Annotated[u.Quantity, TIME]
 Velocity = Annotated[u.Quantity, VELOCITY]
 Angle = Annotated[u.Quantity, ANGLE]
-SolidAngle = Annotated[u.Quantity, SOLIDANGLE]
-AngularVelocity = Annotated[u.Quantity, ANGULARVELOCITY]
+SolidAngle = Annotated[u.Quantity, SOLID_ANGLE]
+AngularVelocity = Annotated[u.Quantity, ANGULAR_VELOCITY]
 Adu = Annotated[u.Quantity, ADU]
 Gain = Annotated[u.Quantity, GAIN]
-PixelScale = Annotated[u.Quantity, PIXELSCALE]
+QuantumEfficiency = Annotated[u.Quantity, QUANTUM_EFFICIENCY]
+PixelScale = Annotated[u.Quantity, PIXEL_SCALE]
 Throughput = Annotated[u.Quantity, THROUGHPUT]
-SpectralFluxDensity = Annotated[u.Quantity, SPECTRALFLUXDENSITY]
-PhotonFlux = Annotated[u.Quantity, PHOTONFLUX]
+SpectralFluxDensity = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY]
+PhotonFlux = Annotated[u.Quantity, PHOTON_FLUX]
 Radiance = Annotated[u.Quantity, RADIANCE]
-RadiantIntensity = Annotated[u.Quantity, RADIANTINTENSITY]
+RadiantIntensity = Annotated[u.Quantity, RADIANT_INTENSITY]
