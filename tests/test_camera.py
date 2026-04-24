@@ -11,14 +11,12 @@ def camera():
     """A fixture returning a Camera instance."""
     gain = 1.5 * (u.electron / u.adu)
     pixel_scale = 0.2 * (u.arcsec / u.pix)
-    exptime = 15.0 * u.s
     bandpasses = RubinBandpassProvider().load("u")
-    return Camera(bandpasses, exptime, gain, pixel_scale)
+    return Camera(bandpasses, gain, pixel_scale)
 
 
 def test_camera_creation(camera):
     """Test the creation of a Camera instance."""
-    assert camera.exptime == 15.0 * u.s
     assert camera.qe == 1.0 * u.electron / u.ph
     assert camera.gain == 1.5 * (u.electron / u.adu)
     assert camera.pixel_scale == 0.2 * (u.arcsec / u.pix)
@@ -26,27 +24,26 @@ def test_camera_creation(camera):
 
 
 @pytest.mark.parametrize(
-    "exptime,gain,pixel_scale,expected_error",
+    "gain,pixel_scale,expected_error",
     [
-        (15.0 * u.s, 1.5, 0.2 * (u.arcsec / u.pix), TypeError),
-        (15.0 * u.s, 1.5 * (u.electron / u.adu), 0.2, TypeError),
-        (15.0, 1.5 * (u.electron / u.adu), 0.2 * (u.arcsec / u.pix), TypeError),
+        (1.5, 0.2 * (u.arcsec / u.pix), TypeError),
+        (1.5 * (u.electron / u.adu), 0.2, TypeError),
     ],
 )
-def test_camera_creation_invalid(exptime, gain, pixel_scale, expected_error):
+def test_camera_creation_invalid(gain, pixel_scale, expected_error):
     """Test that creation of a Camera raises proper exception for invalid
     cases.
     """
     bandpasses = RubinBandpassProvider().load("u")
     with pytest.raises(expected_error):
-        Camera(bandpasses, exptime, gain, pixel_scale)
+        Camera(bandpasses, gain, pixel_scale)
 
 
 def test_from_config():
     """Test the creation of a Camera instance from a configuration
     dictionary.
     """
-    config = {"exptime": 15.0, "gain": 1.5, "pixel_scale": 0.2, "bands": ["u"], "qe": 1.0}
+    config = {"gain": 1.5, "pixel_scale": 0.2, "bands": ["u"], "qe": 1.0}
     camera = Camera.from_config(config)
     assert isinstance(camera, Camera)
 

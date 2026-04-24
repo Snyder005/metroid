@@ -30,13 +30,6 @@ class Observatory:
         else:
             raise ValueError("must be 'EarthLocation'")
 
-        self._photo_params = PhotometricParameters(
-            self.camera.exptime,
-            self.camera.gain,
-            self.pupil.area,
-            qe=self.camera.qe,
-        )
-
     @property
     def camera(self) -> Camera:
         """The observatory camera (`metroid.camera.Camera`)."""
@@ -54,9 +47,8 @@ class Observatory:
         """
         return self._location
 
-    @property
     @enforce_units
-    def photo_params(self) -> PhotometricParameters:
+    def get_photo_params(self, exptime: Time) -> PhotometricParameters:
         """Create photometric parameters for an exposure.
 
         Parameters
@@ -76,12 +68,19 @@ class Observatory:
         ValueError
             Raised if ``exptime`` has an invalid unit or value.
         """
-        return self._photo_params
+        photo_params = PhotometricParameters(
+            exptime=exptime, gain=self.camera.gain, area=self.pupil.area, qe=self.camera.qe
+        )
+        return photo_params
 
     @enforce_units
-    def calculate_adu(self, name: str, brightness_spec: str | Sed) -> Adu:
+    def calculate_adu(self, name: str, brightness_spec: float | Sed, exptime: Time) -> Adu:
+        photo_params = self.get_photo_params(exptime)
         bandpass = self.camera.get_bandpass(name)
-        return bandpass.calculate_adu(brightness_spec, self.photo_params)
+        if not isinstance(brightness_spec, float | Sed):
+            raise TypeError("brightness_spec must be `float` or `metroid.sed.Sed`")
 
-    def calculate_adus(self, brightness_spec: str | Sed) -> dict[str, Adu]:
-        return {name: self.calculate_adu(name, brightness_spec) for name in camera.band_names}
+        return bandpass.calculate_adu(brightness_spec, photo_params)
+
+    def calculate_adus(self, brightness_spec: str | Sed, exptime: Time) -> dict[str, Adu]:
+        return {name: self.calculate_adu(name, brightness_spec, exptime) for name in camera.band_names}

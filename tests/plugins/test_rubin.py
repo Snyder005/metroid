@@ -1,8 +1,10 @@
+import pytest
+
 from metroid.bandpass import Bandpass
 from metroid.plugins.rubin import RubinBandpassProvider
 
 
-def test_loads():
+def test_loads_valid():
     """Test that the loads method of RubinBandPassProvider returns correct
     result for valid cases.
     """
@@ -10,3 +12,10 @@ def test_loads():
     bandpasses = provider.load("u")
     assert isinstance(bandpasses, dict)
     assert isinstance(bandpasses["u"], Bandpass)
+
+
+@pytest.mark.parametrize("name,expected_exception", [(5, TypeError), ("J", IOError)])
+def test_loads_invalid(name, expected_exception):
+    provider = RubinBandpassProvider()
+    with pytest.raises(expected_exception):
+        provider.load(name)

@@ -1,8 +1,18 @@
+from __future__ import annotations
+
 import os
+from collections.abc import Callable
+from typing import Any, TYPE_CHECKING
 
 import astropy.units as u
 
 from metroid.bandpass import Bandpass
+
+if TYPE_CHECKING:
+    try:
+        from rubin_sim.phot_utils import Bandpass as RubinBandpass
+    except ImportError:
+        RubinBandpass = Any
 
 
 class RubinBandpassProvider:
@@ -13,7 +23,7 @@ class RubinBandpassProvider:
 
         Parameters
         ----------
-        *bands : `str`
+        *names : `str`
             LSST Camera filter bandpass names.
 
         Returns
@@ -23,6 +33,8 @@ class RubinBandpassProvider:
 
         Raises
         ------
+        IOError
+            Raised if the throughput file does not exist.
         TypeError
             Raised if a bandpass name is an invalid type.
         """
@@ -30,7 +42,7 @@ class RubinBandpassProvider:
         bandpasses = {}
         for name in names:
             if not isinstance(name, str):
-                raise TypeError("must be 'str'")
+                raise TypeError(f"The bandpass name {name} must be 'str'")
             filename = os.path.join(get_data_dir(), "throughputs", "baseline", f"total_{name}.dat")
             rubin_bp = RubinBandpass()
             rubin_bp.read_throughput(filename)
@@ -42,7 +54,8 @@ class RubinBandpassProvider:
 
         return bandpasses
 
-    def _require_rubin(self):
+    def _require_rubin(self) -> tuple[Callable[[], str], type[RubinBandpass]]:
+        """Get required imports from the `rubin_sim` library."""
         try:
             return self._rubin
 
@@ -55,15 +68,17 @@ class RubinBandpassProvider:
                     "The 'rubin' plugin requires the optional dependency 'rubin_sim'. "
                     "Install it with: pip install metroid[rubin]"
                 ) from e
-            
+
             self._rubin = (get_data_dir, RubinBandpass)
 
         return self._rubin
 
     @staticmethod
     def is_available() -> bool:
+        """Check if the provider is available for initialization."""
         try:
-            import rubin_sim # noqa: F401
+            import rubin_sim  # noqa: F401
+
             return True
 
         except ImportError:

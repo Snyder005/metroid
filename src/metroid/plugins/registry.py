@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 from metroid.utils.protocols import BandpassProvider
 
-class _ProviderEntry(TypedDict, closed=True):
+
+class _ProviderEntry(TypedDict):
     provider: type[BandpassProvider] | None
     error: Exception | None
+
 
 _PROVIDERS: dict[str, _ProviderEntry] = {}
 """The registry of bandpass providers."""
 
 
-def register_provider(name: str, provider: type[BandpassProvider] | None, error: Exception | None = None) -> None:
+def register_provider(
+    name: str, provider: type[BandpassProvider] | None, error: Exception | None = None
+) -> None:
     """Register a bandpass provider.
 
     Parameters
@@ -21,8 +27,6 @@ def register_provider(name: str, provider: type[BandpassProvider] | None, error:
         An object implementing the BandpassProvider protocol. Must define a
         ``load()`` method returning bandpasses.
     """
-    if error is not None:
-        provider = None
     _PROVIDERS[name] = _ProviderEntry(provider=provider, error=error)
 
 
@@ -69,7 +73,9 @@ def get_provider(name: str) -> type[BandpassProvider]:
     if provider is None:
         raise RuntimeError(f"Bandpass plugin '{name}' is not properly registered")
 
+    print(entry, provider, error)
     return provider
+
 
 def create_provider(name: str, *args: object, **kwargs: object) -> BandpassProvider:
     """Create a bandpass provider instance from the registry.

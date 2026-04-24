@@ -114,24 +114,17 @@ class Bandpass:
         TypeError
             Raised if ``brightness_spec`` is invalid type:
         """
-        if isinstance(brightness_spec, float):
-            return self.ab_zeropoint * 10 ** (-brightness_spec / 2.5)
+        sed = self._ensure_sed(brightness_spec)
+        flux = self._convolve(sed, photon_weighted=True)
+        return flux * u.ph
 
-        elif isinstance(brightness_spec, Sed):
-            flux = self._fr.convolve_with_array(
-                brightness_spec.wavelength.value,
-                brightness_spec.flambda,
-                photon_weighted=True,
-                interpolate=True,
-                units=brightness_spec.flambda.unit,
-            )
-            return flux * u.ph
 
-        else:
-            raise TypeError("unsupported brightness specification type")
+    def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux:
+        sed = self._ensure_sed(brightness_spec)
+        return self._convolve(sed, photon_weighted=False)
 
     @enforce_units
-    def calculate_adu(self, brightness_spec: str | Sed, photo_params: PhotometricParameters) -> Adu:
+    def calculate_adu(self, brightness_spec: float | Sed, photo_params: PhotometricParameters) -> Adu:
         if not isinstance(photo_params, PhotometricParameters):
             raise TypeError("must be 'metroid.photo_params.PhotometricParameters'")
 
@@ -153,3 +146,26 @@ class Bandpass:
             The AB magnitude of the object.
         """
         return self._fr.get_ab_magnitude(sed.flambda, sed.wavelength)
+
+    def _ensure_sed(self, brightness_spec: float | Sed) -> Sed:
+        if isinstance(brightness_spec, Sed):
+            return brightness_spec
+
+        elif isinstance(brightness_spec, float):
+            sed = Sed.for_ab_magnitudes()
+
+            scale = 10 ** (-0.4 * brightness_spec)
+            return Sed(sed.wavelength, sed.flambda * scale)
+        
+        else:
+            raise TypeError("unsupported brightness specification type")
+
+    def _convolve(self, sed: Sed, photon_weighted: bool = True) - > u.Quantity:
+        result = self._fr.convolve_with_array(
+            sed.wavelength.value,
+            sed.flambda,
+            photon_weighted=photon_weighted,
+            interpolate=True,
+            units=sed.flambda.unit,
+        )
+        return result # find out units

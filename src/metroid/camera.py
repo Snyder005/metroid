@@ -8,7 +8,7 @@ import numpy as np
 
 from metroid.bandpass import Bandpass
 from metroid.plugins.discovery import load_entrypoint_plugins
-from metroid.plugins.registry import get_provider
+from metroid.plugins.registry import create_provider
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import check_quantity, Gain, PixelScale, QuantumEfficiency, Time
 from metroid.utils.validation import get_field_value
@@ -20,13 +20,11 @@ class Camera:
     def __init__(
         self,
         bandpasses: dict[str, Bandpass],
-        exptime: Time,
         gain: Gain,
         pixel_scale: PixelScale,
         qe: QuantumEfficiency = 1.0 * u.electron / u.ph,
     ):
         self._bandpasses = {}
-        self._exptime = exptime
         self._gain = gain
         self._pixel_scale = pixel_scale
         self._qe = qe
@@ -72,7 +70,6 @@ class Camera:
             Raised if a value is an invalid type.
         """
         load_entrypoint_plugins()
-        exptime = get_field_value(config, "exptime", float) * u.s
         gain = get_field_value(config, "gain", float) * u.electron / u.adu
         pixel_scale = get_field_value(config, "pixel_scale", float) * u.arcsec / u.pix
         qe = get_field_value(config, "qe", float) * u.electron / u.ph
@@ -81,10 +78,10 @@ class Camera:
         bandpasses = {}
 
         plugin = "rubin"
-        provider = get_provider(plugin)
+        provider = create_provider(plugin)
         bandpasses = provider.load(*names)
 
-        return cls(bandpasses, exptime, gain, pixel_scale, qe=qe)
+        return cls(bandpasses, gain, pixel_scale, qe=qe)
 
     @property
     def bandpasses(self) -> dict[str, Bandpass]:
@@ -97,12 +94,6 @@ class Camera:
     def band_names(self) -> tuple[str, ...]:
         """The camera filter bandpass names (`tuple` [`str`], read-only)."""
         return tuple(self._bandpasses.keys())
-
-    @property
-    @enforce_units
-    def exptime(self) -> Time:
-        """The camera exposure time (`astropy.units.Quantity`, read-only)."""
-        return self._exptime
 
     @property
     @enforce_units

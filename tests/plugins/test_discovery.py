@@ -7,4 +7,4 @@ def test_load_entrypoint_plugins():
     """Test that load_entrypoint_plugins correctly sets provider."""
     _PROVIDERS.clear()
     load_entrypoint_plugins()
-    assert _PROVIDERS["rubin"] == RubinBandpassProvider
+    assert _PROVIDERS["rubin"]["provider"] == RubinBandpassProvider
