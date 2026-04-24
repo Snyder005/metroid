@@ -3,8 +3,6 @@ import os
 import astropy.units as u
 
 from metroid.bandpass import Bandpass
-from rubin_sim.data import get_data_dir
-from rubin_sim.phot_utils import Bandpass as RubinBandpass
 
 
 class RubinBandpassProvider:
@@ -20,7 +18,7 @@ class RubinBandpassProvider:
 
         Returns
         -------
-        bandpasses : `dict` [str, rubin_sim.phot_utils.Bandpass]
+        bandpasses : `dict` [str, metroid.bandpass.Bandpass]
             A dictionary of Rubin Observatory bandpasses.
 
         Raises
@@ -28,6 +26,7 @@ class RubinBandpassProvider:
         TypeError
             Raised if a bandpass name is an invalid type.
         """
+        get_data_dir, RubinBandpass = self._require_rubin()
         bandpasses = {}
         for name in names:
             if not isinstance(name, str):
@@ -42,3 +41,30 @@ class RubinBandpassProvider:
             bandpasses[name] = bandpass
 
         return bandpasses
+
+    def _require_rubin(self):
+        try:
+            return self._rubin
+
+        except AttributeError:
+            try:
+                from rubin_sim.data import get_data_dir
+                from rubin_sim.phot_utils import Bandpass as RubinBandpass
+            except ImportError as e:
+                raise ImportError(
+                    "The 'rubin' plugin requires the optional dependency 'rubin_sim'. "
+                    "Install it with: pip install metroid[rubin]"
+                ) from e
+            
+            self._rubin = (get_data_dir, RubinBandpass)
+
+        return self._rubin
+
+    @staticmethod
+    def is_available() -> bool:
+        try:
+            import rubin_sim # noqa: F401
+            return True
+
+        except ImportError:
+            return False
