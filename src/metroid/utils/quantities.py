@@ -129,8 +129,11 @@ THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled)
 SPECTRAL_FLUX_DENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
 """The wavelength spectral flux density specification."""
 
-PHOTON_FLUX = QuantitySpec("photon_flux", u.ph / (u.m**2 * u.s))
+PHOTON_FLUX = QuantitySpec("photon_flux", u.ph / (u.s * u.m**2))
 """The spectral photon flux density specification."""
+
+ENERGY_FLUX = QuantitySpec("energy_flux", u.erg / (u.s * u.m**2))
+"""The energy flux density (irradiance) specification."""
 
 RADIANCE = QuantitySpec("radiance", u.W / (u.sr * u.m**2))
 """The radiance specification."""

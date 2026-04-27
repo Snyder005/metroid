@@ -1,11 +1,12 @@
 from typing import Any, Self, TYPE_CHECKING
 
 import astropy.units as u
-from speclite.filters import FilterResponse, load_filter, load_filters
+from speclite.filters import FilterResponse, load_filter
 
 from metroid.sed import Sed
 from metroid.photo_params import PhotometricParameters
 from metroid.utils.decorators import enforce_units
+from metroid.utils.photometry import photon_flux_to_adu
 from metroid.utils.quantities import Adu, PhotonFlux, Throughput, Wavelength
 
 
@@ -125,11 +126,8 @@ class Bandpass:
 
     @enforce_units
     def calculate_adu(self, brightness_spec: float | Sed, photo_params: PhotometricParameters) -> Adu:
-        if not isinstance(photo_params, PhotometricParameters):
-            raise TypeError("must be 'metroid.photo_params.PhotometricParameters'")
-
         photon_flux = self.calculate_photon_flux(brightness_spec)
-        return photon_flux * photo_params.exptime * photo_params.qe * photo_params.area / photo_params.gain
+        return photon_flux_to_adu(photon_flux, photo_params)
 
     @enforce_units
     def calculate_ab_magnitude(self, sed: Sed) -> float:

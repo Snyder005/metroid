@@ -4,6 +4,7 @@ from astropy import units as u
 from astropy.constants import c
 import numpy as np
 
+from speclite.filters import _ab_constant
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Wavelength, SpectralFluxDensity
 
@@ -35,8 +36,7 @@ class Sed:
             An instance of `Sed` initialized for AB magnitude calcultions.
         """
         wavelength = np.arange(wl_min, wl_max + wl_step, wl_step) * u.nm
-        fnu = np.ones(len(wavelength)) * 3631.0 * u.Jy
-        flambda = (fnu * c / wavelength**2).to(u.erg / (u.s * u.cm**2 * u.AA))
+        flambda = (_ab_constant / wavelength**2).to(u.erg / (u.s * u.cm**2 * u.AA))
 
         return cls(wavelength, flambda)
 
