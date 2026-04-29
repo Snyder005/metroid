@@ -3,11 +3,11 @@ from typing import Any, Self, TYPE_CHECKING
 import astropy.units as u
 from speclite.filters import FilterResponse, load_filter
 
-from metroid.sed import Sed
-from metroid.photo_params import PhotometricParameters
+from .conversions import photon_flux_to_adu, energy_flux_to_radiance
+from .photo_params import PhotometricParameters
+from .sed import Sed
 from metroid.utils.decorators import enforce_units
-from metroid.utils.photometry import photon_flux_to_adu
-from metroid.utils.quantities import Adu, PhotonFlux, Throughput, Wavelength
+from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Throughput, Wavelength
 
 
 class Bandpass:
@@ -37,7 +37,7 @@ class Bandpass:
             Raised if ``fr`` is an invalid type.
         """
         if not isinstance(fr, FilterResponse):
-            raise TypeError("must be 'FilterResponse'")
+            raise TypeError("fr must be 'FilterResponse'")
 
         bandpass = cls.__new__(cls)
         bandpass._fr = fr
@@ -93,7 +93,7 @@ class Bandpass:
     @enforce_units
     def ab_zeropoint(self) -> PhotonFlux:
         """The AB zeropoint in units of photons per second per square meter."""
-        return self._fr.ab_zeropoint * u.ph
+        return self._fr.ab_zeropoint
 
     @enforce_units
     def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux:
@@ -116,10 +116,9 @@ class Bandpass:
             Raised if ``brightness_spec`` is invalid type:
         """
         sed = self._ensure_sed(brightness_spec)
-        flux = self._convolve(sed, photon_weighted=True)
-        return flux * u.ph
+        return self._convolve(sed, photon_weighted=True)
 
-
+    @enforce_units
     def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux:
         sed = self._ensure_sed(brightness_spec)
         return self._convolve(sed, photon_weighted=False)
@@ -154,11 +153,11 @@ class Bandpass:
 
             scale = 10 ** (-0.4 * brightness_spec)
             return Sed(sed.wavelength, sed.flambda * scale)
-        
-        else:
-            raise TypeError("unsupported brightness specification type")
 
-    def _convolve(self, sed: Sed, photon_weighted: bool = True) - > u.Quantity:
+        else:
+            raise TypeError("brightness_spec is an unsupported type")
+
+    def _convolve(self, sed: Sed, photon_weighted: bool = True) -> u.Quantity:
         result = self._fr.convolve_with_array(
             sed.wavelength.value,
             sed.flambda,
@@ -166,4 +165,4 @@ class Bandpass:
             interpolate=True,
             units=sed.flambda.unit,
         )
-        return result # find out units
+        return result  # find out units

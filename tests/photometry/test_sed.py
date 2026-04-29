@@ -2,7 +2,7 @@ import pytest
 from astropy import units as u
 import numpy as np
 
-from metroid.sed import Sed
+from metroid.photometry.sed import Sed
 
 
 @pytest.fixture

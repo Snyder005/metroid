@@ -4,8 +4,8 @@ from astropy.constants import G, R_earth, M_earth
 import numpy as np
 import galsim
 
-from metroid.orbital_objects import CircularOrbitalObject, RectangularOrbitalObject
-from metroid.pupils import CircularPupil
+from metroid.profiles.orbital_objects import CircularOrbitalObject, RectangularOrbitalObject
+from metroid.profiles.pupils import CircularPupil
 
 
 @pytest.fixture
@@ -44,10 +44,11 @@ def test_orbital_object_creation(orbital_object):
 
     theta_n = np.arcsin(R_earth * np.sin(theta_z) / (R_earth + h)).to(u.deg)
     d = (R_earth * np.sin(theta_z - theta_n) / np.sin(theta_n)).to(u.km)
-    v_o = np.sqrt(G * M_earth / (R_earth + h)).to(u.m / u.s, equivalencies=u.dimensionless_angles())
+    v_o = np.sqrt(G * M_earth / (R_earth + h)).to(u.m / u.s)
     omega_o = (v_o / (R_earth + h)).to(u.rad / u.s, equivalencies=u.dimensionless_angles())
-    v_p = (v_o * np.cos(theta_n)).to(u.m / u.s, equivalencies=u.dimensionless_angles())
+    v_p = (v_o * np.cos(theta_n)).to(u.m / u.s)
     omega_p = (v_p / d).to(u.rad / u.s, equivalencies=u.dimensionless_angles())
+    solid_angle = (orbital_object.area / d**2).to(u.sr, equivalencies=u.dimensionless_angles())
 
     assert orbital_object.height == h
     assert orbital_object.zenith_angle == theta_z
@@ -59,6 +60,7 @@ def test_orbital_object_creation(orbital_object):
     assert u.isclose(orbital_object.orbital_angular_velocity, omega_o)
     assert u.isclose(orbital_object.perpendicular_velocity, v_p)
     assert u.isclose(orbital_object.perpendicular_angular_velocity, omega_p)
+    assert u.isclose(orbital_object.solid_angle, solid_angle)
 
 
 @pytest.mark.parametrize(
@@ -73,7 +75,7 @@ def test_calculate_pixel_time_valid(orbital_object):
     pixel_scale = 0.2 * (u.arcsec / u.pix)
     t_p = (pixel_scale / orbital_object.perpendicular_angular_velocity).to(u.s, equivalencies=[(u.pix, None)])
 
-    assert orbital_object.calculate_pixel_time(pixel_scale) == t_p
+    assert u.isclose(orbital_object.calculate_pixel_time(pixel_scale), t_p)
 
 
 @pytest.mark.parametrize(

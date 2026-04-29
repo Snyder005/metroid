@@ -6,7 +6,7 @@ from typing import Any, TYPE_CHECKING
 
 import astropy.units as u
 
-from metroid.bandpass import Bandpass
+from metroid.photometry import Bandpass
 
 if TYPE_CHECKING:
     try:

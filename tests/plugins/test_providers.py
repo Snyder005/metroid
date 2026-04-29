@@ -1,6 +1,6 @@
 import pytest
 
-from metroid.plugins.registry import (
+from metroid.plugins.providers import (
     _PROVIDERS,
     _ProviderEntry,
     register_provider,

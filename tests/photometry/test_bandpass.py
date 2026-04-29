@@ -3,8 +3,9 @@ from astropy import units as u
 import numpy as np
 
 from speclite.filters import load_filter
-from metroid.bandpass import Bandpass
-from metroid.sed import Sed
+from metroid.photometry.bandpass import Bandpass
+from metroid.photometry.sed import Sed
+from metroid.photometry.photo_params import PhotometricParameters
 
 
 @pytest.fixture
@@ -19,10 +20,8 @@ def test_bandpass_creation(bandpass):
     """Test the creation of a Bandpass instance."""
     fr = load_filter("lsst2023-g")
 
-    assert bandpass.wavelength.unit == u.AA
-    assert np.allclose(bandpass.wavelength.value, fr.wavelength)
-    assert bandpass.throughput.unit == u.dimensionless_unscaled
-    assert np.allclose(bandpass.throughput.value, fr.response)
+    assert u.allclose(bandpass.wavelength, fr.wavelength * u.AA)
+    assert np.allclose(bandpass.throughput, fr.response * u.dimensionless_unscaled)
     assert bandpass.effective_wavelength.unit == u.AA
     assert bandpass.ab_zeropoint.unit == u.ph / (u.s * u.m**2)
 
@@ -43,6 +42,20 @@ def test_calculate_photon_flux(bandpass, brightness_spec):
     inputs.
     """
     assert u.isclose(bandpass.calculate_photon_flux(brightness_spec), bandpass.ab_zeropoint)
+
+
+@pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])
+def test_calculate_energy_flux(bandpass, brightness_spec):
+    """That that calculate_energy_flux returns correct result for valid
+    inputs.
+    """
+    assert bandpass.calculate_energy_flux(brightness_spec).unit == u.erg / (u.s * u.m**2)
+
+
+@pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])
+def test_calculate_adu(bandpass, brightness_spec):
+    photo_params = PhotometricParameters(1.0 * u.s, 1.0 * u.electron / u.adu, 1.0 * u.m**2)
+    assert bandpass.calculate_adu(brightness_spec, photo_params=photo_params).unit == u.adu
 
 
 def test_calculate_ab_magnitude(bandpass):

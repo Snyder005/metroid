@@ -1,6 +1,6 @@
 import pytest
 
-from metroid.bandpass import Bandpass
+from metroid.photometry.bandpass import Bandpass
 from metroid.plugins.rubin import RubinBandpassProvider
 
 

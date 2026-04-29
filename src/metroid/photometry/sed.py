@@ -3,8 +3,8 @@ from typing import Self
 from astropy import units as u
 from astropy.constants import c
 import numpy as np
-
 from speclite.filters import _ab_constant
+
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Wavelength, SpectralFluxDensity
 

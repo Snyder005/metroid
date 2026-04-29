@@ -1,6 +1,6 @@
 from importlib.metadata import entry_points
 
-from metroid.plugins.registry import register_provider
+from .providers import register_provider
 from metroid.utils.protocols import SupportsAvailability, BandpassProvider
 
 _DISCOVERED = False

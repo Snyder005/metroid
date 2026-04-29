@@ -3,7 +3,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import get_type_hints, ParamSpec, TypeVar
 
-from metroid.utils.quantities import _extract_spec, check_quantity
+from .quantities import _extract_spec, check_quantity
 
 
 def enforce_units[**P, R](func: Callable[P, R]) -> Callable[P, R]:

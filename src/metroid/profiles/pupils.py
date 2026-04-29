@@ -3,13 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import ClassVar, Self
 
-from astropy import units as u
+import astropy.units as u
+import galsim
 import numpy as np
 
-import galsim
 from metroid.utils.validation import get_field_value
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Area, check_quantity, GeometryLength, OrbitalDistance, SolidAngle
+from metroid.utils.quantities import Area, GeometryLength, OrbitalDistance
 
 
 class Pupil(ABC):
@@ -58,7 +58,7 @@ class Pupil(ABC):
         try:
             pupil_type = config.pop("type")
         except KeyError:
-            raise ValueError("missing requird field 'type'") from None
+            raise ValueError("missing required field 'type'") from None
 
         try:
             subcls = cls._registry[pupil_type]
@@ -94,30 +94,6 @@ class Pupil(ABC):
         (`astropy.units.Quantity`, read-only).
         """
         pass
-
-    @enforce_units
-    def get_solid_angle(self, distance: OrbitalDistance) -> SolidAngle:
-        """Get the solid angle of the pupil, in steradians.
-
-        Parameters
-        ----------
-        distance : `astropy.units.Quantity`
-            The distance from the pupil, in kilometers.
-
-        Returns
-        -------
-        solid_angle : `astropy.units.Quantity`
-            The solid angle of the pupil, in steradians.
-
-        Raises
-        ------
-        TypeError
-            Raised if ``distance`` is an invalid type.
-        ValueError
-            Raised if ``distance`` has an invalid unit or value.
-        """
-        solid_angle = self.area / distance**2
-        return solid_angle.to(u.sr, equivalencies=u.dimensionless_angles())
 
     @abstractmethod
     def get_profile(self, distance: OrbitalDistance) -> galsim.GSObject:
@@ -184,10 +160,7 @@ class CircularPupil(Pupil, pupil_type="circular"):
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
-        r = self.radius
-        A = np.pi * r**2
-
-        return A
+        return np.pi * self.radius**2
 
     @enforce_units
     def get_profile(self, distance: OrbitalDistance) -> galsim.TopHat:
@@ -210,12 +183,8 @@ class CircularPupil(Pupil, pupil_type="circular"):
         ValueError
             Raised if ``distance`` has an invalid unit or value.
         """
-        radius = self.radius / distance
-
-        r = radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = galsim.TopHat(r)
-
-        return profile
+        r = (self.radius / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        return galsim.TopHat(r)
 
 
 class AnnularPupil(Pupil, pupil_type="annular"):
@@ -275,11 +244,7 @@ class AnnularPupil(Pupil, pupil_type="annular"):
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
-        r_o = self.outer_radius
-        r_i = self.inner_radius
-        A = np.pi * (r_o**2 - r_i**2)
-
-        return A
+        return np.pi * (self.outer_radius**2 - self.inner_radius**2)
 
     @enforce_units
     def get_profile(self, distance: OrbitalDistance) -> galsim.Sum:
@@ -302,11 +267,6 @@ class AnnularPupil(Pupil, pupil_type="annular"):
         ValueError
             Raised if ``distance`` has an invalid unit or value.
         """
-        outer_radius = self.outer_radius / distance
-        inner_radius = self.inner_radius / distance
-
-        r_o = outer_radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        r_i = inner_radius.to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        profile = galsim.TopHat(r_o) - galsim.TopHat(r_i, flux=(r_i / r_o) ** 2)
-
-        return profile
+        r_o = (self.outer_radius / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        r_i = (self.inner_radius / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        return galsim.TopHat(r_o) - galsim.TopHat(r_i, flux=(r_i / r_o) ** 2)

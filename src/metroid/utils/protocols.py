@@ -4,7 +4,7 @@ from typing import Protocol, runtime_checkable, TYPE_CHECKING
 from collections.abc import Mapping
 
 if TYPE_CHECKING:
-    from metroid.bandpass import Bandpass
+    from metroid.photometry import Bandpass
 
 
 @runtime_checkable

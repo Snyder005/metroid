@@ -1,5 +1,5 @@
 from metroid.plugins.discovery import load_entrypoint_plugins
-from metroid.plugins.registry import _PROVIDERS
+from metroid.plugins.providers import _PROVIDERS
 from metroid.plugins.rubin import RubinBandpassProvider
 
 

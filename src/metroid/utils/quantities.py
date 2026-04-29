@@ -7,10 +7,17 @@ import numpy as np
 class QuantitySpec:
     """A quantity specification."""
 
-    def __init__(self, name: str, default: u.Unit, typical_range: tuple[float, float] | None = None):
+    def __init__(
+        self,
+        name: str,
+        default: u.Unit,
+        typical_range: tuple[float, float] | None = None,
+        equivalencies: list | None = None,
+    ):
         self.name = name
         self.default = default
         self.typical_range = typical_range
+        self.equivalencies = equivalencies or []
 
 
 def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
@@ -34,10 +41,10 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
     if not isinstance(quantity, u.Quantity):
         raise TypeError(f"{spec.name} must be 'astropy.units.Quantity'")
 
-    if not quantity.unit.is_equivalent(spec.default):
+    if not quantity.unit.is_equivalent(spec.default, equivalencies=spec.equivalencies):
         raise ValueError(f"invalid unit for {spec.name}: {quantity.unit}")
 
-    quantity = quantity.to(spec.default)
+    quantity = quantity.to(spec.default, equivalencies=spec.equivalencies)
     if spec.typical_range is not None:
         value = quantity.value
         vmin, vmax = spec.typical_range
@@ -96,7 +103,7 @@ ORBITAL_DISTANCE = QuantitySpec("orbital_distance", u.km, typical_range=(1e2, 1e
 AREA = QuantitySpec("area", u.m**2, typical_range=(1e-6, 1e6))
 """The area specification."""
 
-TIME = QuantitySpec("time", u.s)
+TIME = QuantitySpec("time", u.s, typical_range=(0.0, 1e5))
 """The time specification."""
 
 VELOCITY = QuantitySpec("velocity", u.m / u.s)
@@ -105,10 +112,10 @@ VELOCITY = QuantitySpec("velocity", u.m / u.s)
 ANGLE = QuantitySpec("angle", u.deg)
 """The angle specification."""
 
-SOLID_ANGLE = QuantitySpec("solid_angle", u.sr)
+SOLID_ANGLE = QuantitySpec("solid_angle", u.sr, equivalencies=u.dimensionless_angles())
 """The solid angle specification."""
 
-ANGULAR_VELOCITY = QuantitySpec("angular_velocity", u.rad / u.s)
+ANGULAR_VELOCITY = QuantitySpec("angular_velocity", u.rad / u.s, equivalencies=u.dimensionless_angles())
 """The angular velocity specification."""
 
 ADU = QuantitySpec("adu", u.adu)
@@ -123,13 +130,13 @@ QUANTUM_EFFICIENCY = QuantitySpec("qe", u.electron / u.ph, typical_range=(1e0, 1
 PIXEL_SCALE = QuantitySpec("pixel_scale", u.arcsec / u.pix, typical_range=(1e-2, 1e1))
 """The pixel scale specification."""
 
-THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled)
+THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled, typical_range=(0.0, 1.0))
 """The throughput specification."""
 
 SPECTRAL_FLUX_DENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
 """The wavelength spectral flux density specification."""
 
-PHOTON_FLUX = QuantitySpec("photon_flux", u.ph / (u.s * u.m**2))
+PHOTON_FLUX = QuantitySpec("photon_flux", u.ph / (u.s * u.m**2), equivalencies=[(u.ph, None)])
 """The spectral photon flux density specification."""
 
 ENERGY_FLUX = QuantitySpec("energy_flux", u.erg / (u.s * u.m**2))
@@ -157,5 +164,6 @@ PixelScale = Annotated[u.Quantity, PIXEL_SCALE]
 Throughput = Annotated[u.Quantity, THROUGHPUT]
 SpectralFluxDensity = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY]
 PhotonFlux = Annotated[u.Quantity, PHOTON_FLUX]
+EnergyFlux = Annotated[u.Quantity, ENERGY_FLUX]
 Radiance = Annotated[u.Quantity, RADIANCE]
 RadiantIntensity = Annotated[u.Quantity, RADIANT_INTENSITY]

@@ -6,9 +6,9 @@ from typing import Self
 import astropy.units as u
 import numpy as np
 
-from metroid.bandpass import Bandpass
+from metroid.photometry.bandpass import Bandpass
 from metroid.plugins.discovery import load_entrypoint_plugins
-from metroid.plugins.registry import create_provider
+from metroid.plugins.providers import create_provider
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import check_quantity, Gain, PixelScale, QuantumEfficiency, Time
 from metroid.utils.validation import get_field_value

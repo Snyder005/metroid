@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 
 import astropy.units as u
 from astropy.constants import G, R_earth, M_earth
+import galsim
 import numpy as np
 
-import galsim
-from metroid.pupils import Pupil
+from .pupils import Pupil
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import (
     Angle,
@@ -14,6 +14,7 @@ from metroid.utils.quantities import (
     GeometryLength,
     OrbitalDistance,
     PixelScale,
+    SolidAngle,
     Time,
     Velocity,
 )
@@ -33,11 +34,7 @@ class OrbitalObject(ABC):
         self.height = height
         self.zenith_angle = zenith_angle
         self.rotation_angle = rotation_angle
-
-        if isinstance(nadir_pointing, bool):
-            self.nadir_pointing = nadir_pointing
-        else:
-            raise TypeError("must be 'bool'")
+        self.nadir_pointing = nadir_pointing
 
     @property
     @enforce_units
@@ -84,7 +81,7 @@ class OrbitalObject(ABC):
     @nadir_pointing.setter
     def nadir_pointing(self, value: bool) -> None:
         if not isinstance(value, bool):
-            raise ValueError("must be 'bool'")
+            raise ValueError("nadir_pointing must be 'bool'")
 
         self._nadir_pointing = value
 
@@ -113,8 +110,7 @@ class OrbitalObject(ABC):
         """The orbital velocity of the object, in meters per second
         (`astropy.units.Quantity`, read-only).
         """
-        v = np.sqrt(G * M_earth / (R_earth + self.height))
-        return v.to(u.m / u.s, equivalencies=u.dimensionless_angles())
+        return np.sqrt(G * M_earth / (R_earth + self.height))
 
     @property
     @enforce_units
@@ -122,8 +118,7 @@ class OrbitalObject(ABC):
         """The orbital angular velocity of the object, in radians per second
         (`astropy.units.Quantity`, read-only).
         """
-        omega = self.orbital_velocity / (R_earth + self.height)
-        return omega.to(u.rad / u.s, equivalencies=u.dimensionless_angles())
+        return self.orbital_velocity / (R_earth + self.height)
 
     @property
     @enforce_units
@@ -134,8 +129,7 @@ class OrbitalObject(ABC):
         v = self.orbital_velocity
         theta = self.nadir_angle
         phi = self.rotation_angle
-        v_p = v * np.sqrt(1 - np.sin(theta) ** 2 * np.cos(phi) ** 2)
-        return v_p.to(u.m / u.s, equivalencies=u.dimensionless_angles())
+        return v * np.sqrt(1 - np.sin(theta) ** 2 * np.cos(phi) ** 2)
 
     @property
     @enforce_units
@@ -144,8 +138,15 @@ class OrbitalObject(ABC):
         line-of-sight, in radians per second (`astropy.units.Quantity`,
         read-only).
         """
-        omega_p = self.perpendicular_velocity / self.distance
-        return omega_p.to(u.rad / u.s, equivalencies=u.dimensionless_angles())
+        return self.perpendicular_velocity / self.distance
+
+    @property
+    @enforce_units
+    def solid_angle(self) -> SolidAngle:
+        """The solid angle of the object, in steradians
+        (`astropy.units.Quantity`, read-only).
+        """
+        return self.area / self.distance**2
 
     @property
     @abstractmethod
@@ -188,8 +189,7 @@ class OrbitalObject(ABC):
         ValueError
             Raised if ``pixel_scale`` has an invalid unit or value.
         """
-        t_p = pixel_scale / self.perpendicular_angular_velocity
-        return t_p.to(u.s, equivalencies=[(u.pix, None)])
+        return pixel_scale * u.pix / self.perpendicular_angular_velocity
 
     def get_tracked_profile(self, psf: galsim.GSObject, telescope_pupil: Pupil) -> galsim.Convolution:
         """Get the tracked surface brightness profile of the object.
@@ -212,7 +212,7 @@ class OrbitalObject(ABC):
             Raised if either ``psf`` or ``telescope_pupil`` is an invalid type.
         """
         if not isinstance(telescope_pupil, Pupil):
-            raise TypeError("must be 'metroid.Pupil'")
+            raise TypeError("must be 'metroid.profiles.Pupil'")
 
         if not isinstance(psf, galsim.GSObject):
             raise TypeError("must be 'galsim.GSObject'")

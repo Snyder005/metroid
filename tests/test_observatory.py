@@ -4,10 +4,10 @@ from astropy.coordinates import EarthLocation
 import numpy as np
 
 from metroid.observatory import Observatory
-from metroid.pupils import CircularPupil
+from metroid.profiles.pupils import CircularPupil
 from metroid.camera import Camera
 from metroid.plugins.rubin import RubinBandpassProvider
-from metroid.sed import Sed
+from metroid.photometry.sed import Sed
 
 
 @pytest.fixture

@@ -4,9 +4,9 @@ from astropy.constants import h, c
 import numpy as np
 
 from metroid.camera import Camera
-from metroid.pupils import Pupil
-from metroid.sed import Sed
-from metroid.photo_params import PhotometricParameters
+from metroid.profiles.pupils import Pupil
+from metroid.photometry.sed import Sed
+from metroid.photometry.photo_params import PhotometricParameters
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Time, Adu
 
