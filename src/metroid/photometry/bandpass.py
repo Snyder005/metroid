@@ -28,7 +28,7 @@ class Bandpass:
 
         Returns
         -------
-        bandpass : `metroid.bandpass.Bandpass`
+        bandpass : `metroid.photometry.Bandpass`
             The bandpass initialized from the filter response curve.
 
         Raises
@@ -54,7 +54,7 @@ class Bandpass:
 
         Returns
         -------
-        bandpass : `metroid.bandpass.Bandpass`
+        bandpass : `metroid.photometry.Bandpass`
             The bandpass initialized from the loaded filter response.
 
         Raises
@@ -70,7 +70,7 @@ class Bandpass:
     @property
     @enforce_units
     def wavelength(self) -> Wavelength:
-        """The wavelength array in units of Angstrom
+        """The wavelength array in units of Angstroms
         (`astropy.units.Quantity`).
         """
         return self._fr.wavelength * u.AA
@@ -86,7 +86,7 @@ class Bandpass:
     @property
     @enforce_units
     def effective_wavelength(self) -> Wavelength:
-        """The effective wavelength of the bandpass."""
+        """The effective wavelength of the bandpass in units of Angstroms."""
         return self._fr.effective_wavelength
 
     @property
@@ -97,34 +97,74 @@ class Bandpass:
 
     @enforce_units
     def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux:
-        """Calculate the photon flux corresponding to the magnitude.
+        """Calculate a photon flux density.
 
         Parameters
         ----------
-        brightness_spec : `float` or `metroid.sed.Sed`
-            The brightness specification. Can be either an AB
-            magnitude or the SED of an observed object.
+        brightness_spec : `float` or `metroid.photometry.Sed`
+            The brightness specification. Can be either an AB magnitude or the
+            SED of an observed object.
 
         Returns
         -------
         photon_flux : `astropy.units.Quantity`
-            The photon flux in units of photons per second per square meter.
+            The photon flux density in units of photons per second per square
+            meter.
 
         Raises
         ------
         TypeError
-            Raised if ``brightness_spec`` is invalid type:
+            Raised if ``brightness_spec`` is unsupported type:
         """
         sed = self._ensure_sed(brightness_spec)
         return self._convolve(sed, photon_weighted=True)
 
     @enforce_units
     def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux:
+        """Calculate an energy flux density.
+
+        Parameters
+        ----------
+        brightness_spec : `float` or `metroid.photometry.Sed`
+            The brightness specification. Can be either an AB magnitude or the
+            SED of an observed object.
+
+        Returns
+        -------
+        energy_flux : `astropy.units.Quantity`
+            The energy flux density in units of ergs per second per square
+            meter.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``brightness_spec`` is an unsupported type:
+        """
         sed = self._ensure_sed(brightness_spec)
         return self._convolve(sed, photon_weighted=False)
 
     @enforce_units
     def calculate_adu(self, brightness_spec: float | Sed, photo_params: PhotometricParameters) -> Adu:
+        """Calculate the summed ADU of an observation.
+
+        Parameters
+        ----------
+        brightness_spec : `float` or `metroid.photometry.Sed`
+            The brightness specification. Can be either an AB magnitude or the
+            SED of an observed object.
+        photo_params : `metroid.photometry.PhotometricParameters`
+            The photometric parameters of the observation.
+
+        Returns
+        -------
+        adu : `astropy.units.Quantity`
+            The summed ADU of the observation.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``brightness_spec`` is an unsupported type.
+        """
         photon_flux = self.calculate_photon_flux(brightness_spec)
         return photon_flux_to_adu(photon_flux, photo_params)
 
@@ -134,7 +174,7 @@ class Bandpass:
 
         Parameters
         ----------
-        sed : `metroid.sed.Sed`
+        sed : `metroid.photometry.Sed`
             The SED of the object.
 
         Returns
@@ -145,6 +185,24 @@ class Bandpass:
         return self._fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
     def _ensure_sed(self, brightness_spec: float | Sed) -> Sed:
+        """Ensure the correct SED is provided an observed object.
+
+        Parameters
+        ----------
+        brightness_spec : `float` or `metroid.photometry.Sed`
+            The brightness specification. Can be either an AB magnitude or the
+            SED of an observed object.
+
+        Returns
+        -------
+        sed : `metroid.photometry.Sed`
+            The SED of the observed object.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``brightness_spec`` is an unsupported type.
+        """
         if isinstance(brightness_spec, Sed):
             return brightness_spec
 
@@ -158,6 +216,20 @@ class Bandpass:
             raise TypeError("brightness_spec is an unsupported type")
 
     def _convolve(self, sed: Sed, photon_weighted: bool = True) -> u.Quantity:
+        """Convolve the bandpass with an SED.
+
+        Parameters
+        ----------
+        sed : `metroid.photometry.Sed`
+            The SED of an observed object.
+        photon_weighted : `bool`, optional
+            Use photon counting weights if `True`, otherwise use unit weights.
+
+        Returns
+        -------
+        result : `astropy.units.Quantity`
+            The result of the convolution.
+        """
         result = self._fr.convolve_with_array(
             sed.wavelength.value,
             sed.flambda,

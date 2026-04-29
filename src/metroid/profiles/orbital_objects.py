@@ -76,6 +76,7 @@ class OrbitalObject(ABC):
 
     @property
     def nadir_pointing(self) -> bool:
+        """`True` if object is nadir pointing, `False` otherwise (`bool`)."""
         return self._nadir_pointing
 
     @nadir_pointing.setter

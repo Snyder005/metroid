@@ -6,6 +6,8 @@ from metroid.utils.protocols import BandpassProvider
 
 
 class _ProviderEntry(TypedDict):
+    """An entry in a registry of providers."""
+
     provider: type[BandpassProvider] | None
     error: Exception | None
 

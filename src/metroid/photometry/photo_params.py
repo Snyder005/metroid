@@ -7,6 +7,8 @@ from metroid.utils.quantities import Area, Gain, QuantumEfficiency, Time
 
 @dataclass
 class PhotometricParameters:
+    """Photometric parameters for an observation."""
+
     exptime: Time
     gain: Gain
     area: Area
