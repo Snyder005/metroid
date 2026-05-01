@@ -130,7 +130,7 @@ QUANTUM_EFFICIENCY = QuantitySpec("qe", u.electron / u.ph, typical_range=(1e0, 1
 PIXEL_SCALE = QuantitySpec("pixel_scale", u.arcsec / u.pix, typical_range=(1e-2, 1e1))
 """The pixel scale specification."""
 
-THROUGHPUT = QuantitySpec("throughput", u.dimensionless_unscaled, typical_range=(0.0, 1.0))
+FRACTION = QuantitySpec("fraction", u.dimensionless_unscaled, typical_range=(0.0, 1.0))
 """The throughput specification."""
 
 SPECTRAL_FLUX_DENSITY = QuantitySpec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA))
@@ -161,7 +161,7 @@ Adu = Annotated[u.Quantity, ADU]
 Gain = Annotated[u.Quantity, GAIN]
 QuantumEfficiency = Annotated[u.Quantity, QUANTUM_EFFICIENCY]
 PixelScale = Annotated[u.Quantity, PIXEL_SCALE]
-Throughput = Annotated[u.Quantity, THROUGHPUT]
+Fraction = Annotated[u.Quantity, FRACTION]
 SpectralFluxDensity = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY]
 PhotonFlux = Annotated[u.Quantity, PHOTON_FLUX]
 EnergyFlux = Annotated[u.Quantity, ENERGY_FLUX]

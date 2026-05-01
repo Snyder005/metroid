@@ -3,9 +3,7 @@ from astropy import units as u
 import numpy as np
 
 from speclite.filters import load_filter
-from metroid.photometry.bandpass import Bandpass
-from metroid.photometry.sed import Sed
-from metroid.photometry.photo_params import PhotometricParameters
+from metroid.photometry import ThroughputCurve, Sed, PhotometricParameters
 
 
 @pytest.fixture
@@ -13,7 +11,7 @@ def bandpass():
     """A fixture returning a Camera instance."""
     fr = load_filter("lsst2023-g")
 
-    return Bandpass(fr.wavelength * u.AA, fr.response * u.dimensionless_unscaled, fr.meta)
+    return ThroughputCurve(fr.wavelength * u.AA, fr.response * u.dimensionless_unscaled, fr.meta)
 
 
 def test_bandpass_creation(bandpass):
@@ -29,11 +27,11 @@ def test_bandpass_creation(bandpass):
 def test_from_filter_response():
     fr = load_filter("lsst2023-g")
 
-    assert isinstance(Bandpass.from_filter_response(fr), Bandpass)
+    assert isinstance(ThroughputCurve.from_filter_response(fr), ThroughputCurve)
 
 
 def test_load_filter():
-    assert isinstance(Bandpass.load_filter("lsst2023-g"), Bandpass)
+    assert isinstance(ThroughputCurve.load_filter("lsst2023-g"), ThroughputCurve)
 
 
 @pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])

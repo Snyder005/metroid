@@ -20,7 +20,7 @@ def test_camera_creation(camera):
     assert camera.qe == 1.0 * u.electron / u.ph
     assert camera.gain == 1.5 * (u.electron / u.adu)
     assert camera.pixel_scale == 0.2 * (u.arcsec / u.pix)
-    assert camera.band_names == ("u",)
+    assert camera.filter_names == ("u",)
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_get_bandpass_valid(camera):
     result for valid cases.
     """
     expected_bandpass = RubinBandpassProvider().load("u")["u"]
-    bandpass = camera.get_bandpass("u")
+    bandpass = camera["u"]
 
     assert np.allclose(bandpass.wavelength.value, expected_bandpass.wavelength.value)
     assert np.allclose(bandpass.throughput.value, expected_bandpass.throughput.value)
@@ -64,34 +64,4 @@ def test_get_bandpass_invalid(camera):
     exception for invalid cases.
     """
     with pytest.raises(ValueError):
-        camera.get_bandpass("unknown")
-
-
-def test_get_bandpasses_valid(camera):
-    """Test that get_bandpasses method of a Camera instance returns correct
-    result for valid cases.
-    """
-    expected_bandpasses = RubinBandpassProvider().load("u")
-    bandpasses = camera.bandpasses
-
-    assert np.allclose(bandpasses["u"].wavelength.value, expected_bandpasses["u"].wavelength.value)
-    assert np.allclose(bandpasses["u"].throughput.value, expected_bandpasses["u"].throughput.value)
-
-
-# def test_get_throughput_valid(camera):
-#    """Test that get_throughput method of a Camera instance returns correct
-#    result for valid cases.
-#    """
-#    bandpass = RubinBandpassProvider().load("u")["u"]
-#    dlambda = bandpass.wavelength[1] - bandpass.wavelength[0]
-#    expected_throughput = np.sum(bandpass.sb * dlambda / bandpass.wavelen)
-#
-#    assert camera.get_throughput("u") == pytest.approx(expected_throughput)
-
-
-# def test_get_throughput_invalid(camera):
-#    """Test that get_throughput method of a Camera instance raises proper
-#    exception for invalid cases.
-#    """
-#    with pytest.raises(ValueError):
-#        camera.get_throughput("unknown")
+        camera["unknown"]

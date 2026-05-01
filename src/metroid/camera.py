@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import copy
+from types import MappingProxyType
 from typing import Self
 
 import astropy.units as u
 import numpy as np
 
-from metroid.photometry.bandpass import Bandpass
+from metroid.photometry.throughput import ThroughputCurve
 from metroid.plugins.discovery import load_entrypoint_plugins
 from metroid.plugins.providers import create_provider
 from metroid.utils.decorators import enforce_units
@@ -19,12 +20,11 @@ class Camera:
     @enforce_units
     def __init__(
         self,
-        bandpasses: dict[str, Bandpass],
+        bandpasses: dict[str, ThroughputCurve],
         gain: Gain,
         pixel_scale: PixelScale,
         qe: QuantumEfficiency = 1.0 * u.electron / u.ph,
     ):
-        self._bandpasses = {}
         self._gain = gain
         self._pixel_scale = pixel_scale
         self._qe = qe
@@ -33,10 +33,22 @@ class Camera:
             if not isinstance(key, str):
                 raise TypeError("must be 'str'")
 
-            if not isinstance(value, Bandpass):
+            if not isinstance(value, ThroughputCurve):
                 raise TypeError("must be 'Bandpass'")
 
-            self._bandpasses[key] = copy.deepcopy(value)
+        self._bandpasses = MappingProxyType(bandpasses)
+
+    def __getitem__(self, key):
+        try:
+            return self._bandpasses[key]
+        except KeyError:
+            raise ValueError(f"unknown bandpass name: {key}") from None
+
+    def __iter__(self):
+        return iter(self._bandpasses)
+
+    def __len__(self):
+        return len(self._bandpasses)
 
     @classmethod
     def from_config(cls, config: dict[str, str | float]) -> Self:
@@ -84,14 +96,7 @@ class Camera:
         return cls(bandpasses, gain, pixel_scale, qe=qe)
 
     @property
-    def bandpasses(self) -> dict[str, Bandpass]:
-        """A dictionary of the bandpasses
-        (`dict` [str, metroid.bandpass.Bandpass]).
-        """
-        return copy.deepcopy(self._bandpasses)
-
-    @property
-    def band_names(self) -> tuple[str, ...]:
+    def filter_names(self) -> tuple[str, ...]:
         """The camera filter bandpass names (`tuple` [`str`], read-only)."""
         return tuple(self._bandpasses.keys())
 
@@ -118,23 +123,3 @@ class Camera:
         read-only).
         """
         return self._qe
-
-    def get_bandpass(self, name: str) -> Bandpass:
-        """Get a deep copy of a bandpass.
-
-        Parameters
-        ----------
-        name : `str`
-            The bandpass name.
-
-        Returns
-        -------
-        bandpass : `metroid.bandpass.Bandpass`
-            A deep copy of the corresponding bandpass.
-        """
-        try:
-            bandpass = self._bandpasses[name]
-        except KeyError:
-            raise ValueError(f"unknown bandpass name: {name}") from None
-
-        return copy.deepcopy(bandpass)

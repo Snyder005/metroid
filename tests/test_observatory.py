@@ -4,10 +4,10 @@ from astropy.coordinates import EarthLocation
 import numpy as np
 
 from metroid.observatory import Observatory
-from metroid.profiles.pupils import CircularPupil
+from metroid.profiles import CircularPupil
 from metroid.camera import Camera
 from metroid.plugins.rubin import RubinBandpassProvider
-from metroid.photometry.sed import Sed
+from metroid.photometry import Sed
 
 
 @pytest.fixture
@@ -35,24 +35,3 @@ def test_get_photo_params(observatory):
     assert photo_params.gain.value == pytest.approx(1.5)
     assert photo_params.area.value == pytest.approx(np.pi * 4.0**2)
     assert photo_params.qe.value == pytest.approx(1.0)
-
-
-@pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])
-def test_calculate_adu(observatory, brightness_spec):
-    name = "u"
-    exptime = 15.0 * u.s
-    area = observatory.pupil.area
-    gain = observatory.camera.gain
-    qe = observatory.camera.qe
-    photon_flux = observatory.camera.get_bandpass("u").ab_zeropoint
-
-    expected_adu = photon_flux * exptime * qe * area / gain
-
-    adu = observatory.calculate_adu("u", brightness_spec, exptime)
-    assert u.isclose(adu, expected_adu)
-
-
-# def test_calculate_radiant_intensity(observatory):
-#    radiant_intensity = observatory.calculate_radiant_intensity("u", 5.0, 15.0 * u.s, 500.0 * u.km)
-#
-#    assert isinstance(radiant_intensity, u.Quantity)

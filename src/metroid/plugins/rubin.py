@@ -6,7 +6,7 @@ from typing import Any, TYPE_CHECKING
 
 import astropy.units as u
 
-from metroid.photometry import Bandpass
+from metroid.photometry import ThroughputCurve
 
 if TYPE_CHECKING:
     try:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class RubinBandpassProvider:
     """A Rubin Observatory bandpass provider."""
 
-    def load(self, *names: str) -> dict[str, Bandpass]:
+    def load(self, *names: str) -> dict[str, ThroughputCurve]:
         """Load Rubin Observatory bandpasses.
 
         Parameters
@@ -48,7 +48,11 @@ class RubinBandpassProvider:
             rubin_bp.read_throughput(filename)
 
             meta = {"group_name": "rubin", "band_name": name}
-            bandpass = Bandpass(rubin_bp.wavelen * u.nm, rubin_bp.sb * u.dimensionless_unscaled, meta=meta)
+            bandpass = ThroughputCurve(
+                rubin_bp.wavelen * u.nm,
+                rubin_bp.sb * u.dimensionless_unscaled,
+                meta=meta,
+            )
 
             bandpasses[name] = bandpass
 

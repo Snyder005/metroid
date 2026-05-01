@@ -72,15 +72,3 @@ class Observatory:
             exptime=exptime, gain=self.camera.gain, area=self.pupil.area, qe=self.camera.qe
         )
         return photo_params
-
-    @enforce_units
-    def calculate_adu(self, name: str, brightness_spec: float | Sed, exptime: Time) -> Adu:
-        photo_params = self.get_photo_params(exptime)
-        bandpass = self.camera.get_bandpass(name)
-        if not isinstance(brightness_spec, float | Sed):
-            raise TypeError("brightness_spec must be `float` or `metroid.sed.Sed`")
-
-        return bandpass.calculate_adu(brightness_spec, photo_params)
-
-    def calculate_adus(self, brightness_spec: str | Sed, exptime: Time) -> dict[str, Adu]:
-        return {name: self.calculate_adu(name, brightness_spec, exptime) for name in camera.band_names}

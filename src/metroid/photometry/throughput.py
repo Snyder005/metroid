@@ -7,15 +7,19 @@ from .conversions import photon_flux_to_adu, energy_flux_to_radiance
 from .photo_params import PhotometricParameters
 from .sed import Sed
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Throughput, Wavelength
+from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Fraction, Wavelength
 
 
-class Bandpass:
-    """A throughput curve for a filter band."""
+class ThroughputCurve:
+    """A throughput curve representing fractional transmission as a function
+    of wavelength.
+    """
 
     @enforce_units
-    def __init__(self, wavelength: Wavelength, throughput: Throughput, meta: dict[str, Any]):
-        self._fr = FilterResponse(wavelength.value, throughput.value, meta)
+    def __init__(self, wavelength: Wavelength, throughput: Fraction, meta: dict[str, Any]):
+        fr = FilterResponse(wavelength.value, throughput.value, meta)
+        self.__fr = self._freeze_filter_response(fr)
+        self._frozen = True
 
     @classmethod
     def from_filter_response(cls, fr: FilterResponse) -> Self:
@@ -40,7 +44,8 @@ class Bandpass:
             raise TypeError("fr must be 'FilterResponse'")
 
         bandpass = cls.__new__(cls)
-        bandpass._fr = fr
+        bandpass._ThroughputCurve__fr = cls._freeze_filter_response(fr)
+        bandpass._frozen = True
         return bandpass
 
     @classmethod
@@ -73,27 +78,27 @@ class Bandpass:
         """The wavelength array in units of Angstroms
         (`astropy.units.Quantity`).
         """
-        return self._fr.wavelength * u.AA
+        return self.__fr.wavelength * u.AA
 
     @property
     @enforce_units
-    def throughput(self) -> Throughput:
+    def throughput(self) -> Fraction:
         """The throughput array in dimensionless units
         (`astropy.units.Quantity`).
         """
-        return self._fr.response * u.dimensionless_unscaled
+        return self.__fr.response * u.dimensionless_unscaled
 
     @property
     @enforce_units
     def effective_wavelength(self) -> Wavelength:
         """The effective wavelength of the bandpass in units of Angstroms."""
-        return self._fr.effective_wavelength
+        return self.__fr.effective_wavelength
 
     @property
     @enforce_units
     def ab_zeropoint(self) -> PhotonFlux:
         """The AB zeropoint in units of photons per second per square meter."""
-        return self._fr.ab_zeropoint
+        return self.__fr.ab_zeropoint
 
     @enforce_units
     def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux:
@@ -182,7 +187,7 @@ class Bandpass:
         magnitude : `float`
             The AB magnitude of the object.
         """
-        return self._fr.get_ab_magnitude(sed.flambda, sed.wavelength)
+        return self.__fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
     def _ensure_sed(self, brightness_spec: float | Sed) -> Sed:
         """Ensure the correct SED is provided an observed object.
@@ -230,11 +235,17 @@ class Bandpass:
         result : `astropy.units.Quantity`
             The result of the convolution.
         """
-        result = self._fr.convolve_with_array(
+        result = self.__fr.convolve_with_array(
             sed.wavelength.value,
             sed.flambda,
             photon_weighted=photon_weighted,
             interpolate=True,
             units=sed.flambda.unit,
         )
-        return result  # find out units
+        return result
+
+    @staticmethod
+    def _freeze_filter_response(fr: FilterResponse) -> FilterResponse:
+        fr._wavelength.flags.writeable = False
+        fr._response.flags.writeable = False
+        return fr

@@ -1,6 +1,6 @@
 import pytest
 
-from metroid.photometry.bandpass import Bandpass
+from metroid.photometry.throughput import ThroughputCurve
 from metroid.plugins.rubin import RubinBandpassProvider
 
 
@@ -11,7 +11,7 @@ def test_loads_valid():
     provider = RubinBandpassProvider()
     bandpasses = provider.load("u")
     assert isinstance(bandpasses, dict)
-    assert isinstance(bandpasses["u"], Bandpass)
+    assert isinstance(bandpasses["u"], ThroughputCurve)
 
 
 @pytest.mark.parametrize("name,expected_exception", [(5, TypeError), ("J", IOError)])
