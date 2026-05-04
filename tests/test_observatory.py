@@ -6,14 +6,13 @@ import numpy as np
 from metroid.observatory import Observatory
 from metroid.profiles import CircularPupil
 from metroid.camera import Camera
-from metroid.plugins.rubin import RubinBandpassProvider
-from metroid.photometry import Sed
+from metroid.photometry import Sed, ThroughputCurve
 
 
 @pytest.fixture
 def observatory():
     """A fixture returning an Observatory instance."""
-    bandpasses = RubinBandpassProvider().load("u")
+    bandpasses = {"lsst2023-u": ThroughputCurve.load_filter("lsst2023-u")}
     camera = Camera(bandpasses, 1.5 * (u.electron / u.adu), 0.2 * (u.arcsec / u.pix))
     pupil = CircularPupil(4.0 * u.m)
     location = EarthLocation.of_site("Rubin")

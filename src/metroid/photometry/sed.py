@@ -3,7 +3,7 @@ from typing import Self
 from astropy import units as u
 from astropy.constants import c
 import numpy as np
-from speclite.filters import _ab_constant
+from speclite.filters import _ab_constant, validate_wavelength_array
 
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Wavelength, SpectralFluxDensity
@@ -14,7 +14,10 @@ class Sed:
 
     @enforce_units
     def __init__(self, wavelength: Wavelength, flambda: SpectralFluxDensity):
-        self._wavelength = wavelength
+        if len(wavelength.value) != len(flambda.value):
+            raise ValueError("wavelength and flambda arrays must have same length.")
+
+        self._wavelength = validate_wavelength_array(wavelength, min_length=2) * u.AA
         self._flambda = flambda
 
     @classmethod

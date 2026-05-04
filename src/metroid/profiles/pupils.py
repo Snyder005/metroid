@@ -29,9 +29,9 @@ class Pupil(ABC):
         configuration dictionary.
 
         This class method defines a standardized way to construct an instance
-        of a subclass, whose type is specified in the configuration. It is
-        intended for creating an instance from a JSON file that contains a
-        "pupil" section.
+        of a subclass that is specified in the configuration. It is intended
+        for creating an instance from a JSON file that contains a "pupil"
+        section.
 
         Parameters
         ----------
@@ -58,7 +58,7 @@ class Pupil(ABC):
         try:
             pupil_type = config.pop("type")
         except KeyError:
-            raise ValueError("missing required field 'type'") from None
+            raise ValueError("config is missing required field 'type'") from None
 
         try:
             subcls = cls._registry[pupil_type]

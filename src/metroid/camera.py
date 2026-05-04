@@ -8,8 +8,6 @@ import astropy.units as u
 import numpy as np
 
 from metroid.photometry.throughput import ThroughputCurve
-from metroid.plugins.discovery import load_entrypoint_plugins
-from metroid.plugins.providers import create_provider
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import check_quantity, Gain, PixelScale, QuantumEfficiency, Time
 from metroid.utils.validation import get_field_value
@@ -49,51 +47,6 @@ class Camera:
 
     def __len__(self):
         return len(self._bandpasses)
-
-    @classmethod
-    def from_config(cls, config: dict[str, str | float]) -> Self:
-        """Create a `Camera` instance from a configuration dictionary.
-
-        Parameters
-        ----------
-        config : `dict`
-            A configuration dictionary with fields:
-
-            ``"pixel_scale"``
-                The pixel scale of the camera, in arcseconds per pixel
-                (`float`).
-
-            ``"gain"``
-                The camera gain, in electrons per pixel (`float`).
-
-            ``"bands"``
-                A list of camera throughput bands (`list` [`str`]).
-
-        Returns
-        -------
-        camera : `Camera`
-            An instance of `Camera` initialized with the configuration.
-
-        Raises
-        ------
-        ValueError
-            Raised if a required field does not exist.
-        TypeError
-            Raised if a value is an invalid type.
-        """
-        load_entrypoint_plugins()
-        gain = get_field_value(config, "gain", float) * u.electron / u.adu
-        pixel_scale = get_field_value(config, "pixel_scale", float) * u.arcsec / u.pix
-        qe = get_field_value(config, "qe", float) * u.electron / u.ph
-        names = tuple(get_field_value(config, "bands", list))
-
-        bandpasses = {}
-
-        plugin = "rubin"
-        provider = create_provider(plugin)
-        bandpasses = provider.load(*names)
-
-        return cls(bandpasses, gain, pixel_scale, qe=qe)
 
     @property
     def filter_names(self) -> tuple[str, ...]:

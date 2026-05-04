@@ -11,14 +11,13 @@ class QuantitySpec:
         self,
         name: str,
         default: u.Unit,
-        typical_range: tuple[float, float] | None = None,
         equivalencies: list | None = None,
+        typical_range: tuple[float, float] | None = None,
     ):
         self.name = name
         self.default = default
-        self.typical_range = typical_range
         self.equivalencies = equivalencies or []
-
+        self.typical_range = typical_range
 
 def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
     """Check that quantity has valid units and value.
@@ -34,6 +33,13 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
     -------
     quantity : `astropy.units.Quantity`
         The quantity in the specified default units.
+
+    Raises
+    ------
+    TypeError
+        Raised if ``quantity`` or ``spec`` are invalid types.
+    ValueError
+        Raised if ``quantity`` fails a validation check.
     """
     if not isinstance(spec, QuantitySpec):
         raise TypeError(f"{spec} must be 'metroid.utils.quantities.QuantitySpec'")
@@ -81,6 +87,8 @@ def _extract_spec(annotation: Any) -> QuantitySpec | None:
         for m in meta:
             if isinstance(m, QuantitySpec):
                 return m
+
+        return _extract_spec(base)
 
     if origin is Union:
         for arg in get_args(annotation):

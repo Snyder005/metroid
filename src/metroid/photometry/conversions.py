@@ -7,6 +7,20 @@ from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Radiance, Soli
 
 @enforce_units
 def energy_flux_to_radiance(flux: EnergyFlux, solid_angle: SolidAngle) -> Radiance:
+    """Convert an energy flux density to radiance.
+
+    Parameters
+    ----------
+    flux : `astropy.units.Quantity`
+        The energy flux density in units of ergs per second per square meters.
+    solid_angle : `astropy.units.Quantity`
+        The solid angle of the emitting object.
+
+    Returns
+    -------
+    radiance : `astropy.units.Quantity`
+        The radiance of the emitting object.
+    """
     return flux / solid_angle
 
 

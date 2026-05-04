@@ -1,11 +1,10 @@
-from dataclasses import dataclass
-
 import astropy.units as u
 
+from metroid.utils.decorators import validated_dataclass
 from metroid.utils.quantities import Area, Gain, QuantumEfficiency, Time
 
 
-@dataclass
+@validated_dataclass(frozen=True)
 class PhotometricParameters:
     """Photometric parameters for an observation."""
 

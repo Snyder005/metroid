@@ -19,7 +19,6 @@ class ThroughputCurve:
     def __init__(self, wavelength: Wavelength, throughput: Fraction, meta: dict[str, Any]):
         fr = FilterResponse(wavelength.value, throughput.value, meta)
         self.__fr = self._freeze_filter_response(fr)
-        self._frozen = True
 
     @classmethod
     def from_filter_response(cls, fr: FilterResponse) -> Self:
