@@ -2,7 +2,7 @@ import inspect
 import functools
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, get_type_hints, ParamSpec, TypeVar
+from typing import Any, get_type_hints
 
 from .quantities import _extract_spec, check_quantity
 

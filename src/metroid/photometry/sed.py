@@ -1,7 +1,6 @@
 from typing import Self
 
 from astropy import units as u
-from astropy.constants import c
 import numpy as np
 from speclite.filters import _ab_constant, validate_wavelength_array
 
