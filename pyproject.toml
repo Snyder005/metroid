@@ -15,14 +15,11 @@ dependencies = [
     "numpy",
     "astropy",
     "galsim",
+    "speclite",
 ]
 
 [project.optional-dependencies]
 dev = ["black", "pytest"]
-rubin = ["rubin-sim"]
-
-[project.entry-points."metroid.bandpass"]
-rubin = "metroid.plugins.rubin:RubinBandpassProvider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

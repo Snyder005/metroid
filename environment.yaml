@@ -2,18 +2,15 @@ name: metroid
 channels:
   - conda-forge
 dependencies:
-  - python=3.13.12
-  - scikit-learn
-  - scikit-image
-  - notebook
-  - pandas
-  - astropy
-  - scipy
-  - jupyterlab
-  - matplotlib
+  - python=3.13
+  # Runtime dependencies (mirror pyproject.toml [project.dependencies])
   - numpy
+  - astropy
   - galsim
-  - rubin-sim
+  - speclite
+  # Dev dependencies (mirror pyproject.toml [project.optional-dependencies.dev])
   - black
   - pytest
-  - speclite
+  # Interactive development / visualization
+  - matplotlib
+  - notebook
