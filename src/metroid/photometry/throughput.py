@@ -1,9 +1,9 @@
-from typing import Any, Self, TYPE_CHECKING
+from typing import Any, Self
 
 import astropy.units as u
 from speclite.filters import FilterResponse, load_filter
 
-from .conversions import photon_flux_to_adu, energy_flux_to_radiance
+from .conversions import photon_flux_to_adu
 from .photo_params import PhotometricParameters
 from .sed import Sed
 from metroid.utils.decorators import enforce_units

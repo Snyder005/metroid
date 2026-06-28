@@ -7,5 +7,5 @@ __all__ = [
     "CircularPupil",
     "OrbitalObject",
     "Pupil",
-    "RectangularOrbit",
+    "RectangularOrbitalObject",
 ]

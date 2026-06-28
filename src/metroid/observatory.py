@@ -1,14 +1,10 @@
-import astropy.units as u
 from astropy.coordinates import EarthLocation
-from astropy.constants import h, c
-import numpy as np
 
 from metroid.camera import Camera
 from metroid.profiles.pupils import Pupil
-from metroid.photometry.sed import Sed
 from metroid.photometry.photo_params import PhotometricParameters
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Time, Adu
+from metroid.utils.quantities import Time
 
 
 class Observatory:

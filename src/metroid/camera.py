@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import copy
 from types import MappingProxyType
-from typing import Self
 
 import astropy.units as u
-import numpy as np
 
 from metroid.photometry.throughput import ThroughputCurve
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import check_quantity, Gain, PixelScale, QuantumEfficiency, Time
-from metroid.utils.validation import get_field_value
+from metroid.utils.quantities import Gain, PixelScale, QuantumEfficiency
 
 
 class Camera:

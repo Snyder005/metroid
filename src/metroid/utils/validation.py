@@ -27,12 +27,12 @@ def get_field_value[T](config: Mapping[str, object], name: str, dtype: type[T]) 
         Raised if ``name`` or ``value`` is an invalid type.
     """
     if not isinstance(name, str):
-        raise TypeError(f"name must be 'str'")
+        raise TypeError("name must be 'str'")
 
     try:
         value = config[name]
     except KeyError:
-        raise ValueError(f"config is missing required field {name}")
+        raise ValueError(f"config is missing required field '{name}'")
 
     if not isinstance(value, dtype):
         raise TypeError(f"value must be '{dtype.__name__}'")
