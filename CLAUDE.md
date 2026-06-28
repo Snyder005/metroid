@@ -53,20 +53,22 @@ This repository contains `metroid`, a Python library to simulate streaks and tra
   1. Create or reference an issue
   2. `git checkout -b feature/issue-123-description`
   3. Commit in small, logical increments
-  4. `git push` and open a draft PR early
+  4. Open a draft PR early
   5. Convert to ready PR when functionally complete and tests pass
   6. Never merge automatically, always prompt first
 
 ## Repository Layout:
 
-src/
-    metroid/
-tests/
+- Production code in `src/metroid`
+- Tests in `tests` mirror the package structure
+- Subpackages in subdirectories of `src/metroid`
+- Public utilities in `src/metroid/utils`
 
-environment.yaml
-pyproject.toml
-README.md
+## Context Management
 
-- Production code lives in `src/metroid`.
-- Tests mirror the package structure.
-- Code divided into core implementation, submodules, and public utilities.
+- CLAUDE.md provides context of the directory contents
+  - At top-level and in each subdirectory containing production code
+- Include list of Known issues / gotchas
+  - Include the GitHub issues referencing an item
+  - Remove item if GitHub issue is closed
+- Update context if new bugs are found or fundamental changes are made to code architecture
