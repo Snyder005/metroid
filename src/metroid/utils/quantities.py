@@ -11,8 +11,9 @@ class; the core :func:`check_quantity` validator never changes. The fluent
 :class:`Spec` builder keeps the catalogue declarations terse.
 """
 
+import types
 from dataclasses import dataclass, field, replace
-from typing import Annotated, Any, Protocol, Union, get_args, get_origin, runtime_checkable
+from typing import Annotated, Any, Protocol, TypeAliasType, Union, get_args, get_origin, runtime_checkable
 
 import astropy.units as u
 import numpy as np
@@ -81,6 +82,80 @@ class Finite:
         return None
 
 
+# ----------------------------------------------------------------------------
+# Shape: a separate axis from the physical spec.  Scalar-vs-array is a computer
+# representation, not a physical property, so it lives outside QuantitySpec and
+# is supplied at the annotation site via a generic parameter (e.g. Time[Scalar])
+# and to check_quantity as the ``shape`` argument.
+# ----------------------------------------------------------------------------
+
+
+@runtime_checkable
+class ShapeKind(Protocol):
+    """A check on the array-shape of a quantity (scalar vs. array).
+
+    Mirrors :class:`Constraint` but is kept distinct so that shape is not
+    confused with a physical, value-level constraint.
+    """
+
+    def check(self, quantity: u.Quantity, name: str) -> str | None:
+        """Return an error message, or ``None`` if the shape is allowed."""
+        ...
+
+
+@dataclass(frozen=True)
+class _Scalar:
+    """Require the quantity to be a single scalar value."""
+
+    def check(self, quantity: u.Quantity, name: str) -> str | None:
+        if not quantity.isscalar:
+            return f"must be scalar, got shape {quantity.shape}"
+        return None
+
+
+@dataclass(frozen=True)
+class _Array:
+    """Require the quantity to be array-valued (non-scalar)."""
+
+    def check(self, quantity: u.Quantity, name: str) -> str | None:
+        if quantity.isscalar:
+            return "must be an array, got a scalar"
+        return None
+
+
+@dataclass(frozen=True)
+class _AnyShape:
+    """Impose no shape restriction (scalar or array both allowed)."""
+
+    def check(self, quantity: u.Quantity, name: str) -> str | None:
+        return None
+
+
+# Stateless singletons - one instance of each shape suffices.
+SCALAR: ShapeKind = _Scalar()
+ARRAY: ShapeKind = _Array()
+ANY_SHAPE: ShapeKind = _AnyShape()
+
+
+class Scalar:
+    """Marker type for a scalar quantity. Use as a subscript: ``Time[Scalar]``."""
+
+
+class Array:
+    """Marker type for an array quantity. Use as a subscript: ``Time[Array]``."""
+
+
+class AnyShape:
+    """Marker type imposing no shape restriction (the default for a bare alias)."""
+
+
+_SHAPE_BY_MARKER: dict[Any, ShapeKind] = {
+    Scalar: SCALAR,
+    Array: ARRAY,
+    AnyShape: ANY_SHAPE,
+}
+
+
 @dataclass(frozen=True)
 class QuantitySpec:
     """A physical quantity specification - unit identity plus constraints.
@@ -137,12 +212,12 @@ class Spec:
         return self._spec
 
 
-def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
-    """Check that quantity has valid units and value.
+def check_quantity(quantity: u.Quantity, spec: QuantitySpec, shape: ShapeKind = ANY_SHAPE) -> u.Quantity:
+    """Check that quantity has valid units, value, and shape.
 
     The unit is converted to the spec's canonical unit, then every
-    value-level constraint is run and all failures are aggregated into a
-    single :class:`QuantityValidationError`.
+    value-level constraint and the shape restriction are run and all
+    failures are aggregated into a single :class:`QuantityValidationError`.
 
     Parameters
     ----------
@@ -150,6 +225,9 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
         The quantity to check.
     spec : `metroid.utils.quantities.QuantitySpec`
         The quantity specification.
+    shape : `metroid.utils.quantities.ShapeKind`, optional
+        The shape restriction (``SCALAR``, ``ARRAY``, or ``ANY_SHAPE``).
+        Defaults to ``ANY_SHAPE`` (scalar or array both allowed).
 
     Returns
     -------
@@ -161,7 +239,7 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
     TypeError
         Raised if ``quantity`` or ``spec`` are invalid types.
     QuantityValidationError
-        Raised if ``quantity`` fails one or more value-level constraints.
+        Raised if ``quantity`` fails one or more value-level or shape checks.
     ValueError
         Raised if the unit is not convertible to the canonical unit.
     """
@@ -177,14 +255,29 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec) -> u.Quantity:
     quantity = quantity.to(spec.default, equivalencies=spec.equivalencies)
 
     problems = [msg for c in spec.constraints if (msg := c.check(quantity, spec.name)) is not None]
+    if (msg := shape.check(quantity, spec.name)) is not None:
+        problems.append(msg)
     if problems:
         raise QuantityValidationError(spec.name, problems)
 
     return quantity
 
 
-def _extract_spec(annotation: Any) -> QuantitySpec | None:
-    """Extract the quantity specification from a type hint.
+def _spec_from_annotated(annotation: Any) -> QuantitySpec | None:
+    """Pull a :class:`QuantitySpec` out of an ``Annotated[...]`` value."""
+    if get_origin(annotation) is Annotated:
+        for meta in get_args(annotation)[1:]:
+            if isinstance(meta, QuantitySpec):
+                return meta
+    return None
+
+
+def _extract_spec(annotation: Any) -> tuple[QuantitySpec | None, ShapeKind]:
+    """Extract the ``(spec, shape)`` pair from a type hint.
+
+    Recurses through generic quantity aliases (``Time``, ``Time[Scalar]``),
+    bare ``Annotated`` hints, and unions (e.g. ``Time[Scalar] | None``). The
+    shape defaults to ``ANY_SHAPE`` when no shape marker is supplied.
 
     Parameters
     ----------
@@ -194,27 +287,41 @@ def _extract_spec(annotation: Any) -> QuantitySpec | None:
     Returns
     -------
     spec : `metroid.utils.quantities.QuantitySpec` or None
-        The extracted quantity specification.
+        The extracted quantity specification, or ``None`` if absent.
+    shape : `metroid.utils.quantities.ShapeKind`
+        The shape restriction; ``ANY_SHAPE`` if unspecified.
     """
     if annotation is None:
-        return None
+        return None, ANY_SHAPE
+
+    # Bare generic alias, e.g. ``Time`` - a TypeAliasType with unbound param.
+    if isinstance(annotation, TypeAliasType):
+        return _spec_from_annotated(annotation.__value__), ANY_SHAPE
 
     origin = get_origin(annotation)
+
+    # Subscripted alias, e.g. ``Time[Scalar]`` - origin is the TypeAliasType,
+    # args carry the supplied shape marker.
+    if isinstance(origin, TypeAliasType):
+        spec = _spec_from_annotated(origin.__value__)
+        args = get_args(annotation)
+        shape = _SHAPE_BY_MARKER.get(args[0], ANY_SHAPE) if args else ANY_SHAPE
+        return spec, shape
+
+    # A directly written ``Annotated`` (not via an alias).
     if origin is Annotated:
-        base, *meta = get_args(annotation)
-        for m in meta:
-            if isinstance(m, QuantitySpec):
-                return m
+        return _spec_from_annotated(annotation), ANY_SHAPE
 
-        return _extract_spec(base)
-
-    if origin is Union:
+    # Optional / Union, e.g. ``Time[Scalar] | None``; first hit wins.
+    # ``X | Y`` (PEP 604) has origin ``types.UnionType``; ``Union[X, Y]`` has
+    # origin ``typing.Union``.
+    if origin is Union or origin is types.UnionType:
         for arg in get_args(annotation):
-            spec = _extract_spec(arg)
-            if spec:
-                return spec
+            spec, shape = _extract_spec(arg)
+            if spec is not None:
+                return spec, shape
 
-    return None
+    return None, ANY_SHAPE
 
 
 # ----------------------------------------------------------------------------
@@ -280,22 +387,27 @@ RADIANCE = Spec("radiance", u.W / (u.sr * u.m**2)).build()
 RADIANT_INTENSITY = Spec("radiant_intensity", u.W / u.sr).build()
 """The radiant intensity specification."""
 
-Wavelength = Annotated[u.Quantity, WAVELENGTH]
-GeometryLength = Annotated[u.Quantity, GEOMETRY_LENGTH]
-OrbitalDistance = Annotated[u.Quantity, ORBITAL_DISTANCE]
-Area = Annotated[u.Quantity, AREA]
-Time = Annotated[u.Quantity, TIME]
-Velocity = Annotated[u.Quantity, VELOCITY]
-Angle = Annotated[u.Quantity, ANGLE]
-SolidAngle = Annotated[u.Quantity, SOLID_ANGLE]
-AngularVelocity = Annotated[u.Quantity, ANGULAR_VELOCITY]
-Adu = Annotated[u.Quantity, ADU]
-Gain = Annotated[u.Quantity, GAIN]
-QuantumEfficiency = Annotated[u.Quantity, QUANTUM_EFFICIENCY]
-PixelScale = Annotated[u.Quantity, PIXEL_SCALE]
-Fraction = Annotated[u.Quantity, FRACTION]
-SpectralFluxDensity = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY]
-PhotonFlux = Annotated[u.Quantity, PHOTON_FLUX]
-EnergyFlux = Annotated[u.Quantity, ENERGY_FLUX]
-Radiance = Annotated[u.Quantity, RADIANCE]
-RadiantIntensity = Annotated[u.Quantity, RADIANT_INTENSITY]
+# Generic type aliases - one per physical quantity, parameterized by shape.
+# The bare alias (``Time``) means "any shape"; ``Time[Scalar]`` / ``Time[Array]``
+# add a shape restriction.  The wrapped type stays ``u.Quantity``, so static
+# type checkers and editors still treat annotated values as quantities.
+
+type Wavelength[Sh] = Annotated[u.Quantity, WAVELENGTH, Sh]
+type GeometryLength[Sh] = Annotated[u.Quantity, GEOMETRY_LENGTH, Sh]
+type OrbitalDistance[Sh] = Annotated[u.Quantity, ORBITAL_DISTANCE, Sh]
+type Area[Sh] = Annotated[u.Quantity, AREA, Sh]
+type Time[Sh] = Annotated[u.Quantity, TIME, Sh]
+type Velocity[Sh] = Annotated[u.Quantity, VELOCITY, Sh]
+type Angle[Sh] = Annotated[u.Quantity, ANGLE, Sh]
+type SolidAngle[Sh] = Annotated[u.Quantity, SOLID_ANGLE, Sh]
+type AngularVelocity[Sh] = Annotated[u.Quantity, ANGULAR_VELOCITY, Sh]
+type Adu[Sh] = Annotated[u.Quantity, ADU, Sh]
+type Gain[Sh] = Annotated[u.Quantity, GAIN, Sh]
+type QuantumEfficiency[Sh] = Annotated[u.Quantity, QUANTUM_EFFICIENCY, Sh]
+type PixelScale[Sh] = Annotated[u.Quantity, PIXEL_SCALE, Sh]
+type Fraction[Sh] = Annotated[u.Quantity, FRACTION, Sh]
+type SpectralFluxDensity[Sh] = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY, Sh]
+type PhotonFlux[Sh] = Annotated[u.Quantity, PHOTON_FLUX, Sh]
+type EnergyFlux[Sh] = Annotated[u.Quantity, ENERGY_FLUX, Sh]
+type Radiance[Sh] = Annotated[u.Quantity, RADIANCE, Sh]
+type RadiantIntensity[Sh] = Annotated[u.Quantity, RADIANT_INTENSITY, Sh]

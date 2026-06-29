@@ -32,14 +32,14 @@ def enforce_units[**P, R](func: Callable[P, R]) -> Callable[P, R]:
             if name in ["self"]:
                 continue
 
-            spec = _extract_spec(hints.get(name))
+            spec, shape = _extract_spec(hints.get(name))
             if spec and value is not None:
-                bound.arguments[name] = check_quantity(value, spec)
+                bound.arguments[name] = check_quantity(value, spec, shape)
 
         result = func(*bound.args, **bound.kwargs)
-        return_spec = _extract_spec(hints.get("return"))
+        return_spec, return_shape = _extract_spec(hints.get("return"))
         if return_spec and result is not None:
-            result = check_quantity(result, return_spec)
+            result = check_quantity(result, return_spec, return_shape)
 
         return result
 
