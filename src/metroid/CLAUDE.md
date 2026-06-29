@@ -31,10 +31,11 @@ The top-level module wires the optics together:
 
 - **Unit enforcement is the central pattern.** Almost every public method and
   property is decorated with `@enforce_units` (from `utils/decorators.py`),
-  which reads `Annotated[u.Quantity, QuantitySpec]` hints (the aliases in
-  `utils/quantities.py`, e.g. `Gain`, `Time`, `Area`) and validates the
-  unit/equivalency/range of inputs *and* the return value. To add a new
-  physical quantity, add a `QuantitySpec` + `Annotated` alias in
+  which reads the generic quantity aliases in `utils/quantities.py`
+  (e.g. `Gain`, `Time`, `Area`; subscript for shape, e.g. `Time[Scalar]`) and
+  validates the unit/equivalency/constraints *and* shape of inputs *and* the
+  return value. To add a new physical quantity, add a `Spec(...)` constant plus
+  a `type NewQuantity[Sh] = Annotated[u.Quantity, NEW_QUANTITY, Sh]` alias in
   `utils/quantities.py` and annotate with it — do not hand-roll unit checks.
 - **Immutability is intentional.** Containers expose read-only properties and
   use `MappingProxyType` / frozen dataclasses / frozen numpy arrays. Recent

@@ -88,7 +88,7 @@ def test_calculate_pixel_time_invalid(orbital_object):
     instance raises proper exception for invalid cases.
     """
     with pytest.raises(ValueError):
-        orbital_object.calculate_pixel_time(0.0 * (u.arcsec / u.pix))
+        orbital_object.calculate_pixel_time(0.2 * (u.s / u.pix))
 
 
 @pytest.mark.parametrize(

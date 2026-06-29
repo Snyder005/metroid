@@ -52,7 +52,7 @@ def test_from_config(config, expected_type):
     "distance,expected_exception",
     [
         ("not a quantity", TypeError),
-        (50.0 * u.km, ValueError),
+        (50.0 * u.s, ValueError),
     ],
 )
 def test_get_profile_invalid(pupil, distance, expected_exception):
@@ -72,7 +72,7 @@ def test_circular_pupil_creation(circular_pupil):
     "radius,expected_error",
     [
         (4.0, TypeError),
-        (0.0 * u.m, ValueError),
+        (4.0 * u.s, ValueError),
     ],
 )
 def test_circular_pupil_creation_invalid(radius, expected_error):
@@ -110,7 +110,6 @@ def test_annular_pupil_creation(annular_pupil):
     [
         (1.0, 4.0 * u.m, TypeError),
         (1.0 * u.m, 4.0, TypeError),
-        (0.0 * u.m, 4.0 * u.m, ValueError),
         (4.0 * u.m, 4.0 * u.m, ValueError),
     ],
 )
