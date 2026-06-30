@@ -1,3 +1,4 @@
+import copy
 from typing import Any, Self
 
 import astropy.units as u
@@ -18,7 +19,7 @@ class ThroughputCurve:
     @enforce_units
     def __init__(self, wavelength: Wavelength[Array], throughput: Fraction[Array], meta: dict[str, Any]):
         fr = FilterResponse(wavelength.value, throughput.value, meta)
-        self.__fr = self._freeze_filter_response(fr)
+        self.__fr = self._adopt_filter_response(fr)
 
     @classmethod
     def from_filter_response(cls, fr: FilterResponse) -> Self:
@@ -43,7 +44,7 @@ class ThroughputCurve:
             raise TypeError("fr must be 'FilterResponse'")
 
         throughput_curve = cls.__new__(cls)
-        throughput_curve._ThroughputCurve__fr = cls._freeze_filter_response(fr)
+        throughput_curve.__fr = cls._adopt_filter_response(fr)
         return throughput_curve
 
     @classmethod
@@ -102,12 +103,12 @@ class ThroughputCurve:
         return self.__fr.ab_zeropoint
 
     @enforce_units
-    def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux[Scalar]:
+    def calculate_photon_flux(self, brightness_spec: float | int | Sed) -> PhotonFlux[Scalar]:
         """Calculate a photon flux density.
 
         Parameters
         ----------
-        brightness_spec : `float` or `metroid.photometry.Sed`
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification. Can be either an AB magnitude or the
             SED of an observed object.
 
@@ -120,7 +121,7 @@ class ThroughputCurve:
         Raises
         ------
         TypeError
-            Raised if ``brightness_spec`` is unsupported type:
+            Raised if ``brightness_spec`` is an unsupported type.
         """
         sed = self._ensure_sed(brightness_spec)
         return self._convolve(sed, photon_weighted=True)
@@ -215,7 +216,8 @@ class ThroughputCurve:
         if isinstance(brightness_spec, Sed):
             return brightness_spec
 
-        elif isinstance(brightness_spec, float):
+        # ``bool`` subclasses ``int`` but is not a valid magnitude.
+        elif isinstance(brightness_spec, (int, float)) and not isinstance(brightness_spec, bool):
             sed = Sed.for_ab_magnitudes()
 
             scale = 10 ** (-0.4 * brightness_spec)
@@ -249,7 +251,27 @@ class ThroughputCurve:
         return result
 
     @staticmethod
-    def _freeze_filter_response(fr: FilterResponse) -> FilterResponse:
+    def _adopt_filter_response(fr: FilterResponse) -> FilterResponse:
+        """Take private, immutable ownership of a filter response.
+
+        ``speclite.filters.load_filter`` returns a *shared, cached*
+        ``FilterResponse`` whose underlying arrays are reused across callers,
+        so freezing them in place would leak read-only state into speclite's
+        global cache. A ``deepcopy`` yields an independent object with
+        independent arrays (and bypasses ``FilterResponse.__init__``, so it is
+        not re-registered into the cache); freezing that copy is safe.
+
+        Parameters
+        ----------
+        fr : `speclite.filters.FilterResponse`
+            The filter response to take ownership of.
+
+        Returns
+        -------
+        fr : `speclite.filters.FilterResponse`
+            A private, frozen copy of the filter response.
+        """
+        fr = copy.deepcopy(fr)
         fr._wavelength.flags.writeable = False
         fr._response.flags.writeable = False
         return fr
