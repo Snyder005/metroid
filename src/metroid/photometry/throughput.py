@@ -7,7 +7,7 @@ from .conversions import photon_flux_to_adu
 from .photo_params import PhotometricParameters
 from .sed import Sed
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Fraction, Wavelength
+from metroid.utils.quantities import Adu, Array, EnergyFlux, PhotonFlux, Fraction, Scalar, Wavelength
 
 
 class ThroughputCurve:
@@ -16,13 +16,13 @@ class ThroughputCurve:
     """
 
     @enforce_units
-    def __init__(self, wavelength: Wavelength, throughput: Fraction, meta: dict[str, Any]):
+    def __init__(self, wavelength: Wavelength[Array], throughput: Fraction[Array], meta: dict[str, Any]):
         fr = FilterResponse(wavelength.value, throughput.value, meta)
         self.__fr = self._freeze_filter_response(fr)
 
     @classmethod
     def from_filter_response(cls, fr: FilterResponse) -> Self:
-        """Create a `Bandpass` instance from a filter response curve.
+        """Create a `ThroughputCurve` instance from a filter response curve.
 
         Parameters
         ----------
@@ -31,8 +31,8 @@ class ThroughputCurve:
 
         Returns
         -------
-        bandpass : `metroid.photometry.Bandpass`
-            The bandpass initialized from the filter response curve.
+        throughput_curve : `metroid.photometry.ThroughputCurve`
+            The throughput curve initialized from the filter response curve.
 
         Raises
         ------
@@ -42,14 +42,14 @@ class ThroughputCurve:
         if not isinstance(fr, FilterResponse):
             raise TypeError("fr must be 'FilterResponse'")
 
-        bandpass = cls.__new__(cls)
-        bandpass._ThroughputCurve__fr = cls._freeze_filter_response(fr)
-        bandpass._frozen = True
-        return bandpass
+        throughput_curve = cls.__new__(cls)
+        throughput_curve._ThroughputCurve__fr = cls._freeze_filter_response(fr)
+        return throughput_curve
 
     @classmethod
     def load_filter(cls, name: str) -> Self:
-        """Create a `Bandpass` instance by loading a filter response by name.
+        """Create a `ThroughputCurve` instance by loading a filter response by
+        name.
 
         Parameters
         ----------
@@ -58,8 +58,8 @@ class ThroughputCurve:
 
         Returns
         -------
-        bandpass : `metroid.photometry.Bandpass`
-            The bandpass initialized from the loaded filter response.
+        throughput_curve : `metroid.photometry.ThroughputCurve`
+            The throughput curve initialized from the loaded filter response.
 
         Raises
         ------
@@ -73,7 +73,7 @@ class ThroughputCurve:
 
     @property
     @enforce_units
-    def wavelength(self) -> Wavelength:
+    def wavelength(self) -> Wavelength[Array]:
         """The wavelength array in units of Angstroms
         (`astropy.units.Quantity`).
         """
@@ -81,7 +81,7 @@ class ThroughputCurve:
 
     @property
     @enforce_units
-    def throughput(self) -> Fraction:
+    def throughput(self) -> Fraction[Array]:
         """The throughput array in dimensionless units
         (`astropy.units.Quantity`).
         """
@@ -89,18 +89,20 @@ class ThroughputCurve:
 
     @property
     @enforce_units
-    def effective_wavelength(self) -> Wavelength:
-        """The effective wavelength of the bandpass in units of Angstroms."""
+    def effective_wavelength(self) -> Wavelength[Scalar]:
+        """The effective wavelength of the throughput curve in units of
+        Angstroms.
+        """
         return self.__fr.effective_wavelength
 
     @property
     @enforce_units
-    def ab_zeropoint(self) -> PhotonFlux:
+    def ab_zeropoint(self) -> PhotonFlux[Scalar]:
         """The AB zeropoint in units of photons per second per square meter."""
         return self.__fr.ab_zeropoint
 
     @enforce_units
-    def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux:
+    def calculate_photon_flux(self, brightness_spec: float | Sed) -> PhotonFlux[Scalar]:
         """Calculate a photon flux density.
 
         Parameters
@@ -124,7 +126,7 @@ class ThroughputCurve:
         return self._convolve(sed, photon_weighted=True)
 
     @enforce_units
-    def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux:
+    def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux[Scalar]:
         """Calculate an energy flux density.
 
         Parameters
@@ -148,7 +150,11 @@ class ThroughputCurve:
         return self._convolve(sed, photon_weighted=False)
 
     @enforce_units
-    def calculate_adu(self, brightness_spec: float | Sed, photo_params: PhotometricParameters) -> Adu:
+    def calculate_adu(
+        self,
+        brightness_spec: float | Sed,
+        photo_params: PhotometricParameters,
+    ) -> Adu[Scalar]:
         """Calculate the summed ADU of an observation.
 
         Parameters
@@ -220,7 +226,7 @@ class ThroughputCurve:
             raise TypeError("brightness_spec is an unsupported type")
 
     def _convolve(self, sed: Sed, photon_weighted: bool = True) -> u.Quantity:
-        """Convolve the bandpass with an SED.
+        """Convolve the throughput curve with an SED.
 
         Parameters
         ----------
