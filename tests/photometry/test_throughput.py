@@ -60,3 +60,28 @@ def test_calculate_ab_magnitude(bandpass):
     sed = Sed.for_ab_magnitudes()
 
     assert np.isclose(bandpass.calculate_ab_magnitude(sed), 0.0)
+
+
+def test_int_magnitude_supported(bandpass):
+    """Regression for #20: int AB magnitudes must be accepted and agree with
+    the equivalent float.
+    """
+    assert u.isclose(bandpass.calculate_photon_flux(20), bandpass.calculate_photon_flux(20.0))
+    assert u.isclose(bandpass.calculate_energy_flux(20), bandpass.calculate_energy_flux(20.0))
+
+
+def test_bool_magnitude_rejected(bandpass):
+    """``bool`` subclasses ``int`` but is not a valid magnitude."""
+    with pytest.raises(TypeError):
+        bandpass.calculate_photon_flux(True)
+
+
+def test_wrap_does_not_freeze_speclite_cache():
+    """Regression for #19: wrapping a filter must not freeze speclite's shared
+    cached arrays.
+    """
+    ThroughputCurve.load_filter("lsst2023-g")
+    fr = load_filter("lsst2023-g")
+
+    assert fr.wavelength.flags.writeable
+    assert fr.response.flags.writeable
