@@ -5,7 +5,7 @@ import numpy as np
 from speclite.filters import _ab_constant, validate_wavelength_array
 
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Wavelength, SpectralFluxDensity
+from metroid.utils.quantities import Array, Wavelength, SpectralFluxDensity
 
 
 class Sed:

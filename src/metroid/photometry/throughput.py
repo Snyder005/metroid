@@ -7,7 +7,7 @@ from .conversions import photon_flux_to_adu
 from .photo_params import PhotometricParameters
 from .sed import Sed
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Fraction, Wavelength
+from metroid.utils.quantities import Adu, Array, EnergyFlux, PhotonFlux, Fraction, Scalar, Wavelength
 
 
 class ThroughputCurve:
@@ -154,7 +154,7 @@ class ThroughputCurve:
         self,
         brightness_spec: float | Sed,
         photo_params: PhotometricParameters,
-        ) -> Adu[Scalar]:
+    ) -> Adu[Scalar]:
         """Calculate the summed ADU of an observation.
 
         Parameters
