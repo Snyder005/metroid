@@ -24,6 +24,26 @@ def energy_flux_to_radiance(flux: EnergyFlux, solid_angle: SolidAngle) -> Radian
 
 @enforce_units
 def photon_flux_to_adu(photon_flux: PhotonFlux, photo_params: PhotometricParameters) -> Adu:
+    """Convert a photon flux density to ADU.
+
+    Parameters
+    ----------
+    photon_flux : `astropy.units.Quantity`
+        The photon flux density in units of photons per second per square
+        meters.
+    photo_params : `metroid.photometry.PhotometricParameters`
+        The photometric parameters of the observation.
+
+    Returns
+    -------
+    adu : `astropy.units.Quantity`
+        The ADU corresponding to the total detected photons.
+
+    Raises
+    ------
+    TypeError
+        Raised if ``photo_params`` is an invalid type.
+    """
     if not isinstance(photo_params, PhotometricParameters):
         raise TypeError("photo_params must be 'metroid.photometry.PhotometricParameters'")
 

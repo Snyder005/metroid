@@ -126,12 +126,12 @@ class ThroughputCurve:
         return self._convolve(sed, photon_weighted=True)
 
     @enforce_units
-    def calculate_energy_flux(self, brightness_spec: float | Sed) -> EnergyFlux[Scalar]:
+    def calculate_energy_flux(self, brightness_spec: float | int | Sed) -> EnergyFlux[Scalar]:
         """Calculate an energy flux density.
 
         Parameters
         ----------
-        brightness_spec : `float` or `metroid.photometry.Sed`
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification. Can be either an AB magnitude or the
             SED of an observed object.
 
@@ -152,14 +152,14 @@ class ThroughputCurve:
     @enforce_units
     def calculate_adu(
         self,
-        brightness_spec: float | Sed,
+        brightness_spec: float | int | Sed,
         photo_params: PhotometricParameters,
     ) -> Adu[Scalar]:
         """Calculate the summed ADU of an observation.
 
         Parameters
         ----------
-        brightness_spec : `float` or `metroid.photometry.Sed`
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification. Can be either an AB magnitude or the
             SED of an observed object.
         photo_params : `metroid.photometry.PhotometricParameters`
@@ -178,7 +178,6 @@ class ThroughputCurve:
         photon_flux = self.calculate_photon_flux(brightness_spec)
         return photon_flux_to_adu(photon_flux, photo_params)
 
-    @enforce_units
     def calculate_ab_magnitude(self, sed: Sed) -> float:
         """Calculate the AB magnitude of an object given its SED.
 
@@ -194,12 +193,12 @@ class ThroughputCurve:
         """
         return self.__fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
-    def _ensure_sed(self, brightness_spec: float | Sed) -> Sed:
+    def _ensure_sed(self, brightness_spec: float | int | Sed) -> Sed:
         """Ensure the correct SED is provided an observed object.
 
         Parameters
         ----------
-        brightness_spec : `float` or `metroid.photometry.Sed`
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification. Can be either an AB magnitude or the
             SED of an observed object.
 

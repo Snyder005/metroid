@@ -39,18 +39,5 @@ flux, and detector ADU. Wraps `speclite.filters` for the heavy lifting.
 
 ## Known issues / gotchas
 
-- **Stale `Bandpass` naming.** This class was renamed `Bandpass` ->
-  `ThroughputCurve` (see git history) but docstrings and the
-  `Returns`/`metroid.photometry.Bandpass` references in `throughput.py` were not
-  updated. Purely cosmetic, but misleading — should be reconciled.
-- **Dead `_frozen` attribute.** `from_filter_response` sets
-  `bandpass._frozen = True`, but `__init__` never sets it and nothing reads it.
-  It does *not* gate any behavior; real immutability comes from the frozen
-  numpy arrays. Either wire it up or remove it.
-- `photon_flux_to_adu` has **no docstring** (PEP 257 is required by the root
-  `CLAUDE.md`); `energy_flux_to_radiance` is documented — bring it in line.
-- `_ensure_sed` accepts only `float` (not `int`) AB magnitudes — passing `0`
-  instead of `0.0` raises `TypeError`. `@enforce_units` does not coerce here
-  because the parameter is annotated `float | Sed`, not a quantity.
 - `_ab_constant` and `validate_wavelength_array` are speclite *private/internal*
   API; upgrades to speclite could break `sed.py`.

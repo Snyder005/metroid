@@ -376,7 +376,7 @@ SPECTRAL_FLUX_DENSITY = Spec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u
 """The wavelength spectral flux density specification."""
 
 PHOTON_FLUX = Spec("photon_flux", u.ph / (u.s * u.m**2), [(u.ph, None)]).build()
-"""The spectral photon flux density specification."""
+"""The photon flux density specification."""
 
 ENERGY_FLUX = Spec("energy_flux", u.erg / (u.s * u.m**2)).build()
 """The energy flux density (irradiance) specification."""
