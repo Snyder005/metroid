@@ -8,7 +8,7 @@ from metroid.utils.quantities import Area, Gain, QuantumEfficiency, Time
 class PhotometricParameters:
     """Photometric parameters for an observation."""
 
-    exptime: Time
-    gain: Gain
-    area: Area
-    qe: QuantumEfficiency = 1.0 * u.electron / u.ph
+    exptime: Time[Scalar]
+    gain: Gain[Scalar]
+    area: Area[Scalar]
+    qe: QuantumEfficiency[Scalar] = 1.0 * u.electron / u.ph

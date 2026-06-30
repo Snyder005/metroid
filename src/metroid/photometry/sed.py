@@ -12,7 +12,7 @@ class Sed:
     """A spectral energy distribution function."""
 
     @enforce_units
-    def __init__(self, wavelength: Wavelength, flambda: SpectralFluxDensity):
+    def __init__(self, wavelength: Wavelength[Array], flambda: SpectralFluxDensity[Array]):
         if len(wavelength.value) != len(flambda.value):
             raise ValueError("wavelength and flambda arrays must have same length.")
 
@@ -44,7 +44,7 @@ class Sed:
 
     @property
     @enforce_units
-    def wavelength(self) -> Wavelength:
+    def wavelength(self) -> Wavelength[Array]:
         """The SED wavelength array in units of Angstrom
         (`astropy.units.Quantity`).
         """
@@ -52,7 +52,7 @@ class Sed:
 
     @property
     @enforce_units
-    def flambda(self) -> SpectralFluxDensity:
+    def flambda(self) -> SpectralFluxDensity[Array]:
         """The SED flux density array in ergs per second per square meters per
         Angstrom (`astropy.units.Quantity`).
         """
