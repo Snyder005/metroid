@@ -43,11 +43,6 @@ directory, README.md is required.
 ### Index Format
 
 Use tabular format with File/Directory, What, and When columns:
-- **File/Directory**: Use backticks around names: `cache.rs`, `config/`
-- **What**: Factual description of contents (nouns, not actions)
-- **When to read**: Task-oriented triggers using action verbs (implementing,
-  debugging, modifying, adding, understanding)
-- At least one column must have content; empty cells use `-`
 
 ```markdown
 # [directory-name]/
