@@ -10,6 +10,7 @@ from metroid.utils.quantities import Gain, PixelScale, QuantumEfficiency
 
 
 class Camera:
+    """An imaging camera with named filter bandpasses."""
 
     @enforce_units
     def __init__(

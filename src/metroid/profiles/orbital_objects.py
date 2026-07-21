@@ -66,7 +66,8 @@ class OrbitalObject(ABC):
     @enforce_units
     def rotation_angle(self) -> Angle:
         """The rotation angle of the object from the horizon, in degrees
-        (`astropy.units.Quantity`)."""
+        (`astropy.units.Quantity`).
+        """
         return self._rotation_angle
 
     @rotation_angle.setter
