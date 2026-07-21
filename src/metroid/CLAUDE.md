@@ -1,53 +1,17 @@
-# `metroid` — top-level package
+# metroid/
 
-Core entry points that compose the rest of the library. See the root
-`CLAUDE.md` for project-wide development rules; this file is context for
-working inside `src/metroid/` and its subpackages.
+## Files
 
-## Mental model
+| File | What | When to read |
+| ---- | ---- | ------------ |
+| `observatory.py` | `Observatory` class composing a `Camera`, `Pupil`, and `EarthLocation`; `get_photo_params` method | Implementing or modifying top-level observatory construction; debugging `PhotometricParameters` creation |
+| `camera.py` | `Camera` class holding named `ThroughputCurve` bandpasses, gain, pixel scale, and quantum efficiency | Implementing or modifying camera construction; debugging bandpass lookup or iteration |
+| `__init__.py` | Empty package init | Checking what the top-level package exports |
 
-`metroid` simulates streaks/trails left by orbiting objects (satellites,
-debris) in astronomical images. The pipeline conceptually is:
+## Subdirectories
 
-```
-OrbitalObject (geometry, velocity, surface-brightness profile)
-        +  Pupil (telescope aperture -> defocus profile)
-        +  PSF (galsim)                       --> tracked galsim profile
-ThroughputCurve + Sed + PhotometricParameters --> flux / ADU scaling
-```
-
-The top-level module wires the optics together:
-
-- **`Observatory`** (`observatory.py`) — composes a `Camera`, a `Pupil`, and an
-  `astropy.coordinates.EarthLocation`. Validates each argument by `isinstance`
-  in `__init__` (raises `ValueError` on mismatch). `get_photo_params(exptime)`
-  builds a `PhotometricParameters` from the camera gain/qe and pupil area.
-- **`Camera`** (`camera.py`) — an immutable container of named bandpasses
-  (`dict[str, ThroughputCurve]`, wrapped in a `MappingProxyType`) plus `gain`,
-  `pixel_scale`, and `qe`. Supports `camera[name]`, iteration, and `len()`.
-  Unknown keys raise `ValueError` (not `KeyError`).
-
-## Conventions used everywhere in `src/`
-
-- **Unit enforcement is the central pattern.** Almost every public method and
-  property is decorated with `@enforce_units` (from `utils/decorators.py`),
-  which reads the generic quantity aliases in `utils/quantities.py`
-  (e.g. `Gain`, `Time`, `Area`; subscript for shape, e.g. `Time[Scalar]`) and
-  validates the unit/equivalency/constraints *and* shape of inputs *and* the
-  return value. To add a new physical quantity, add a `Spec(...)` constant plus
-  a `type NewQuantity[Sh] = Annotated[u.Quantity, NEW_QUANTITY, Sh]` alias in
-  `utils/quantities.py` and annotate with it — do not hand-roll unit checks.
-- **Immutability is intentional.** Containers expose read-only properties and
-  use `MappingProxyType` / frozen dataclasses / frozen numpy arrays. Recent
-  history ("more protected immutability") shows this is a deliberate design
-  value — preserve it.
-- Type hints are required on all code; line length 110 (code) / 79
-  (docstrings); numpydoc style.
-
-## Known issues / gotchas (top-level)
-
-- `Observatory.__init__` validates by `isinstance` and raises `ValueError` for
-  a bad type, whereas most of the codebase raises `TypeError` for type
-  mismatches — inconsistent but currently relied on by tests.
-- `Camera.__getitem__` translates a missing key into `ValueError`, so callers
-  catch `ValueError`, not `KeyError`.
+| Directory | What | When to read |
+| --------- | ---- | ------------ |
+| `photometry/` | Radiometry layer: `ThroughputCurve`, `Sed`, `PhotometricParameters`, flux/ADU conversion functions | Implementing photometric calculations; debugging flux or ADU outputs |
+| `profiles/` | Telescope pupil geometry and orbital object surface-brightness profiles | Implementing or modifying pupil shapes, orbital object geometry, or tracked galsim profiles |
+| `utils/` | Unit enforcement machinery: quantity specs, `@enforce_units` decorator, config validation | Adding a new physical quantity; debugging unit validation errors; modifying enforcement behavior |

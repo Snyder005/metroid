@@ -145,7 +145,7 @@ class ThroughputCurve:
         Raises
         ------
         TypeError
-            Raised if ``brightness_spec`` is an unsupported type:
+            Raised if ``brightness_spec`` is an unsupported type.
         """
         sed = self._ensure_sed(brightness_spec)
         return self._convolve(sed, photon_weighted=False)

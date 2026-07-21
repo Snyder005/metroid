@@ -26,16 +26,16 @@ class Sed:
         Parameters
         ----------
         wl_min : `float`
-            The minimum wavelength.
+            The minimum wavelength, in nanometers.
         wl_max : `float`
-            Maximum wavelength value.
+            The maximum wavelength, in nanometers.
         wl_step : `float`
-            The wavelength increment value.
+            The wavelength step size, in nanometers.
 
         Returns
         -------
         sed : `Sed`
-            An instance of `Sed` initialized for AB magnitude calcultions.
+            An instance of `Sed` initialized for AB magnitude calculations.
         """
         wavelength = np.arange(wl_min, wl_max + wl_step, wl_step) * u.nm
         flambda = (_ab_constant / wavelength**2).to(u.erg / (u.s * u.cm**2 * u.AA))

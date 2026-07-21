@@ -1,14 +1,14 @@
 """Physical quantity specifications and runtime validation.
 
-A :class:`QuantitySpec` reduces a physical quantity to its essential
-identity - a name, a canonical unit, and allowed equivalencies - plus an
-ordered list of pluggable :class:`Constraint` objects. Validation converts
+A `QuantitySpec` reduces a physical quantity to its essential
+identity - a name, a canonical unit, and allowed equivalencies - plus
+an ordered list of pluggable `Constraint` objects. Validation converts
 to canonical units once and then runs every value-level constraint,
-aggregating all failures into a single :class:`QuantityValidationError`.
+aggregating all failures into a single `QuantityValidationError`.
 
 New kinds of value-level check are added by writing a small constraint
-class; the core :func:`check_quantity` validator never changes. The fluent
-:class:`Spec` builder keeps the catalogue declarations terse.
+class; the core `check_quantity` validator never changes. The fluent
+`Spec` builder keeps the catalogue declarations terse.
 """
 
 import types
@@ -22,7 +22,7 @@ import numpy as np
 class QuantityValidationError(ValueError):
     """All value-level validation failures for a single quantity, aggregated.
 
-    Subclasses :class:`ValueError`, so existing ``except ValueError``
+    Subclasses `ValueError`, so existing ``except ValueError``
     handlers continue to catch it.
 
     Parameters
@@ -94,7 +94,7 @@ class Finite:
 class ShapeKind(Protocol):
     """A check on the array-shape of a quantity (scalar vs. array).
 
-    Mirrors :class:`Constraint` but is kept distinct so that shape is not
+    Mirrors `Constraint` but is kept distinct so that shape is not
     confused with a physical, value-level constraint.
     """
 
@@ -160,7 +160,7 @@ _SHAPE_BY_MARKER: dict[Any, ShapeKind] = {
 class QuantitySpec:
     """A physical quantity specification - unit identity plus constraints.
 
-    Prefer the fluent :class:`Spec` builder for declarations.
+    Prefer the fluent `Spec` builder for declarations.
 
     Parameters
     ----------
@@ -181,7 +181,7 @@ class QuantitySpec:
 
 
 class Spec:
-    """Fluent builder producing an immutable :class:`QuantitySpec`.
+    """Fluent builder producing an immutable `QuantitySpec`.
 
     Example
     -------
@@ -217,7 +217,7 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec, shape: ShapeKind = 
 
     The unit is converted to the spec's canonical unit, then every
     value-level constraint and the shape restriction are run and all
-    failures are aggregated into a single :class:`QuantityValidationError`.
+    failures are aggregated into a single `QuantityValidationError`.
 
     Parameters
     ----------
@@ -264,7 +264,7 @@ def check_quantity(quantity: u.Quantity, spec: QuantitySpec, shape: ShapeKind = 
 
 
 def _spec_from_annotated(annotation: Any) -> QuantitySpec | None:
-    """Pull a :class:`QuantitySpec` out of an ``Annotated[...]`` value."""
+    """Pull a `QuantitySpec` out of an ``Annotated[...]`` value."""
     if get_origin(annotation) is Annotated:
         for meta in get_args(annotation)[1:]:
             if isinstance(meta, QuantitySpec):

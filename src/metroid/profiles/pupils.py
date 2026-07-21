@@ -45,7 +45,7 @@ class Pupil(ABC):
         Returns
         -------
         pupil : `Pupil`
-            An instance of a subclass of `Pupil` intialized with the
+            An instance of a subclass of `Pupil` initialized with the
             configuration values.
 
         Raises
@@ -248,7 +248,7 @@ class AnnularPupil(Pupil, pupil_type="annular"):
 
     @enforce_units
     def get_profile(self, distance: OrbitalDistance) -> galsim.Sum:
-        """Get the surface brightness profile of the pupil
+        """Get the surface brightness profile of the pupil.
 
         Parameters
         ----------
