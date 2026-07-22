@@ -1,4 +1,5 @@
 import copy
+import functools
 from typing import Any, Self
 
 import astropy.units as u
@@ -9,6 +10,22 @@ from .photo_params import PhotometricParameters
 from .sed import Sed
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Adu, Array, EnergyFlux, PhotonFlux, Fraction, Scalar, Wavelength
+
+
+@functools.lru_cache(maxsize=1)
+def _reference_sed() -> Sed:
+    """Return the shared flat-AB reference SED, building it once.
+
+    The reference SED is independent of any throughput curve, so it is
+    constructed a single time and reused across every AB-magnitude
+    calculation rather than being rebuilt on each call.
+
+    Returns
+    -------
+    sed : `metroid.photometry.Sed`
+        The flat-AB reference SED.
+    """
+    return Sed.for_ab_magnitudes()
 
 
 class ThroughputCurve:
@@ -123,8 +140,7 @@ class ThroughputCurve:
         TypeError
             Raised if ``brightness_spec`` is an unsupported type.
         """
-        sed = self._ensure_sed(brightness_spec)
-        return self._convolve(sed, photon_weighted=True)
+        return self._flux(brightness_spec, photon_weighted=True)
 
     @enforce_units
     def calculate_energy_flux(self, brightness_spec: float | int | Sed) -> EnergyFlux[Scalar]:
@@ -147,8 +163,7 @@ class ThroughputCurve:
         TypeError
             Raised if ``brightness_spec`` is an unsupported type.
         """
-        sed = self._ensure_sed(brightness_spec)
-        return self._convolve(sed, photon_weighted=False)
+        return self._flux(brightness_spec, photon_weighted=False)
 
     @enforce_units
     def calculate_adu(
@@ -191,22 +206,37 @@ class ThroughputCurve:
         -------
         magnitude : `float`
             The AB magnitude of the object.
+
+        Notes
+        -----
+        AB magnitudes are treated as unitless `float` values, therefore no
+        unit validation is required for this function. This may change in the
+        future, using `astropy.units.ABmag`.
         """
         return self.__fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
-    def _ensure_sed(self, brightness_spec: float | int | Sed) -> Sed:
-        """Ensure the correct SED is provided an observed object.
+    def _flux(self, brightness_spec: float | int | Sed, photon_weighted: bool = True) -> u.Quantity:
+        """Calculate a photon- or energy-weighted flux density.
+
+        For an explicit SED the throughput curve is convolved with it
+        directly. For a scalar AB magnitude the convolution is skipped: the
+        convolution is linear in the spectral flux density, so the result is
+        the reference-SED flux scaled by ``10 ** (-0.4 * magnitude)``. The
+        photon-weighted reference flux is the AB zeropoint, and the
+        energy-weighted reference flux is convolved once and cached.
 
         Parameters
         ----------
         brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification. Can be either an AB magnitude or the
             SED of an observed object.
+        photon_weighted : `bool`, optional
+            Use photon counting weights if `True`, otherwise use unit weights.
 
         Returns
         -------
-        sed : `metroid.photometry.Sed`
-            The SED of the observed object.
+        flux : `astropy.units.Quantity`
+            The photon- or energy-weighted flux density.
 
         Raises
         ------
@@ -214,17 +244,30 @@ class ThroughputCurve:
             Raised if ``brightness_spec`` is an unsupported type.
         """
         if isinstance(brightness_spec, Sed):
-            return brightness_spec
+            return self._convolve(brightness_spec, photon_weighted=photon_weighted)
 
         # ``bool`` subclasses ``int`` but is not a valid magnitude.
         elif isinstance(brightness_spec, (int, float)) and not isinstance(brightness_spec, bool):
-            sed = Sed.for_ab_magnitudes()
-
             scale = 10 ** (-0.4 * brightness_spec)
-            return Sed(sed.wavelength, sed.flambda * scale)
+            reference_flux = self.ab_zeropoint if photon_weighted else self._reference_energy_flux
+            return reference_flux * scale
 
         else:
             raise TypeError("brightness_spec is an unsupported type")
+
+    @functools.cached_property
+    def _reference_energy_flux(self) -> u.Quantity:
+        """The energy-weighted convolution of the flat-AB reference SED.
+
+        Computed once per throughput curve and reused for every scalar
+        AB-magnitude energy flux calculation.
+
+        Returns
+        -------
+        energy_flux : `astropy.units.Quantity`
+            The energy flux density of the flat-AB reference SED.
+        """
+        return self._convolve(_reference_sed(), photon_weighted=False)
 
     def _convolve(self, sed: Sed, photon_weighted: bool = True) -> u.Quantity:
         """Convolve the throughput curve with an SED.
