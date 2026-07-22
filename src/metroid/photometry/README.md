@@ -16,13 +16,22 @@ arrays), `from_filter_response` (from an existing `FilterResponse`),
 and `load_filter` (by filter name). Methods on the class
 (`calculate_photon_flux`, `calculate_energy_flux`, `calculate_adu`,
 `calculate_ab_magnitude`) accept a `brightness_spec` that is either a
-`Sed` instance or a numeric AB magnitude. When a numeric magnitude is
-supplied, `_ensure_sed` constructs a flat-AB reference `Sed` and scales
-its flux by `10**(-0.4 * mag)` before convolving.
+`Sed` instance or a numeric AB magnitude. Both flux methods delegate to
+the shared private method `_flux`. When a `Sed` is supplied, `_flux`
+convolves it directly via `_convolve`. When a scalar AB magnitude is
+supplied, convolution is skipped: because convolution is linear in
+spectral flux density, the result is a reference flux scaled by
+`10**(-0.4 * mag)`. For the photon-weighted path the reference flux is
+`ab_zeropoint`; for the energy-weighted path it is
+`_reference_energy_flux`, a `cached_property` that convolves the
+flat-AB reference SED once per instance. The flat-AB reference SED
+itself is built once at the module level by the `_reference_sed()`
+helper (decorated with `lru_cache(maxsize=1)`) and reused across all
+instances and calls.
 
 `Sed` holds a wavelength array and a spectral flux density array
 (`flambda`). The `for_ab_magnitudes()` classmethod builds the flat-AB
-reference SED used internally by `ThroughputCurve._ensure_sed`.
+reference SED consumed by `_reference_sed()`.
 
 `PhotometricParameters` is a frozen, unit-validated dataclass (using
 `validated_dataclass` from `utils/decorators.py`) holding `exptime`,
