@@ -1,8 +1,8 @@
 from typing import Self
 
 from astropy import units as u
+from astropy.constants import c
 import numpy as np
-from speclite.filters import _ab_constant, validate_wavelength_array
 
 from metroid.utils.decorators import enforce_units
 from metroid.utils.quantities import Array, Wavelength, SpectralFluxDensity
@@ -11,12 +11,18 @@ from metroid.utils.quantities import Array, Wavelength, SpectralFluxDensity
 class Sed:
     """A spectral energy distribution function."""
 
+    _ab_constant = 3631.0 * c * u.Jy
+    """Constant spectral flux density for zero magnitude AB source."""
+
     @enforce_units
     def __init__(self, wavelength: Wavelength[Array], flambda: SpectralFluxDensity[Array]):
         if len(wavelength.value) != len(flambda.value):
             raise ValueError("wavelength and flambda arrays must have same length.")
 
-        self._wavelength = validate_wavelength_array(wavelength, min_length=2) * u.AA
+        if not np.all(np.diff(wavelength.value) > 0):
+            raise ValueError("wavelength values must be strictly increasing.")
+
+        self._wavelength = wavelength
         self._flambda = flambda
 
     @classmethod
@@ -38,7 +44,7 @@ class Sed:
             An instance of `Sed` initialized for AB magnitude calculations.
         """
         wavelength = np.arange(wl_min, wl_max + wl_step, wl_step) * u.nm
-        flambda = (_ab_constant / wavelength**2).to(u.erg / (u.s * u.cm**2 * u.AA))
+        flambda = (cls._ab_constant / wavelength**2).to(u.erg / (u.s * u.cm**2 * u.AA))
 
         return cls(wavelength, flambda)
 
