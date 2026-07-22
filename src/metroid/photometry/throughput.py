@@ -191,6 +191,12 @@ class ThroughputCurve:
         -------
         magnitude : `float`
             The AB magnitude of the object.
+
+        Notes
+        -----
+        AB magnitudes are treated as unitless `float` values, therefore no
+        unit validation is required for this function. This may change in the
+        future, using `astropy.units.ABmag`.
         """
         return self.__fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
