@@ -7,9 +7,9 @@ import astropy.units as u
 import galsim
 import numpy as np
 
-from metroid.utils.validation import get_field_value
-from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Area, GeometryLength, OrbitalDistance
+from ..utils.validation import get_field_value
+from ..utils.decorators import enforce_units
+from ..utils.quantities import Area, GeometryLength, OrbitalDistance, Scalar
 
 
 class Pupil(ABC):
@@ -89,14 +89,14 @@ class Pupil(ABC):
     @property
     @abstractmethod
     @enforce_units
-    def area(self) -> Area:
+    def area(self) -> Area[Scalar]:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         pass
 
     @abstractmethod
-    def get_profile(self, distance: OrbitalDistance) -> galsim.GSObject:
+    def get_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.GSObject:
         """Get the surface brightness profile of the pupil.
 
         Parameters
@@ -116,7 +116,7 @@ class CircularPupil(Pupil, pupil_type="circular"):
     """A circular telescope pupil."""
 
     @enforce_units
-    def __init__(self, radius: GeometryLength):
+    def __init__(self, radius: GeometryLength[Scalar]):
         self._radius = radius
 
     @classmethod
@@ -148,7 +148,7 @@ class CircularPupil(Pupil, pupil_type="circular"):
 
     @property
     @enforce_units
-    def radius(self) -> GeometryLength:
+    def radius(self) -> GeometryLength[Scalar]:
         """The radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -156,14 +156,14 @@ class CircularPupil(Pupil, pupil_type="circular"):
 
     @property
     @enforce_units
-    def area(self) -> Area:
+    def area(self) -> Area[Scalar]:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         return np.pi * self.radius**2
 
     @enforce_units
-    def get_profile(self, distance: OrbitalDistance) -> galsim.TopHat:
+    def get_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.TopHat:
         """Get the surface brightness profile of the pupil.
 
         Parameters
@@ -191,7 +191,7 @@ class AnnularPupil(Pupil, pupil_type="annular"):
     """An annular telescope pupil."""
 
     @enforce_units
-    def __init__(self, inner_radius: GeometryLength, outer_radius: GeometryLength):
+    def __init__(self, inner_radius: GeometryLength[Scalar], outer_radius: GeometryLength[Scalar]):
         self._inner_radius = inner_radius
         self._outer_radius = outer_radius
 
@@ -224,7 +224,7 @@ class AnnularPupil(Pupil, pupil_type="annular"):
 
     @property
     @enforce_units
-    def inner_radius(self) -> GeometryLength:
+    def inner_radius(self) -> GeometryLength[Scalar]:
         """The inner radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -232,7 +232,7 @@ class AnnularPupil(Pupil, pupil_type="annular"):
 
     @property
     @enforce_units
-    def outer_radius(self) -> GeometryLength:
+    def outer_radius(self) -> GeometryLength[Scalar]:
         """The outer radius of the pupil, in meters (`astropy.units.Quantity`,
         read-only).
         """
@@ -240,14 +240,14 @@ class AnnularPupil(Pupil, pupil_type="annular"):
 
     @property
     @enforce_units
-    def area(self) -> Area:
+    def area(self) -> Area[Scalar]:
         """The surface area of the pupil, in square meters
         (`astropy.units.Quantity`, read-only).
         """
         return np.pi * (self.outer_radius**2 - self.inner_radius**2)
 
     @enforce_units
-    def get_profile(self, distance: OrbitalDistance) -> galsim.Sum:
+    def get_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.Sum:
         """Get the surface brightness profile of the pupil.
 
         Parameters
