@@ -195,7 +195,7 @@ class ThroughputCurve:
         return self.__fr.get_ab_magnitude(sed.flambda, sed.wavelength)
 
     def _ensure_sed(self, brightness_spec: float | int | Sed) -> Sed:
-        """Ensure the correct SED is provided an observed object.
+        """Ensure the correct SED is provided for an observed object.
 
         Parameters
         ----------

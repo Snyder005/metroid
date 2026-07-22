@@ -23,6 +23,6 @@ def test_sed_creation(sed):
     assert np.allclose(sed.flambda.value, f)
 
 
-def test_for_adu_magnitudes():
+def test_for_ab_magnitudes():
     """Test the creation of a Sed instance for ADU magnitudes."""
     assert isinstance(Sed.for_ab_magnitudes(), Sed)

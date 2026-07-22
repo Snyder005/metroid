@@ -44,7 +44,7 @@ def test_calculate_photon_flux(bandpass, brightness_spec):
 
 @pytest.mark.parametrize("brightness_spec", [0.0, Sed.for_ab_magnitudes()])
 def test_calculate_energy_flux(bandpass, brightness_spec):
-    """That that calculate_energy_flux returns correct result for valid
+    """Test that calculate_energy_flux returns correct result for valid
     inputs.
     """
     assert bandpass.calculate_energy_flux(brightness_spec).unit == u.erg / (u.s * u.m**2)

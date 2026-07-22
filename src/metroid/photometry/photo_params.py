@@ -1,6 +1,5 @@
 import astropy.units as u
 
-import metroid.utils.quantities as q
 from metroid.utils.decorators import validated_dataclass
 from metroid.utils.quantities import Area, Gain, QuantumEfficiency, Scalar, Time
 
