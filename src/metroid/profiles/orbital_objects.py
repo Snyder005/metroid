@@ -292,6 +292,7 @@ class CircularOrbitalObject(OrbitalObject):
 class RectangularOrbitalObject(OrbitalObject):
     """An orbital object in the shape of a rectangle."""
 
+    @enforce_units
     def __init__(
         self,
         height: OrbitalDistance,
