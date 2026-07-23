@@ -239,9 +239,9 @@ class OrbitalObject(ABC):
             The transformed surface brightness profile.
         """
         mu = np.cos(self.nadir_angle)
-        phi = galsim.Angle(self.rotation_angle, galsim.degrees)
+        phi = galsim.Angle(self.rotation_angle.to_value(u.deg), unit=galsim.degrees)
 
-        return profile.rotate(-phi).transform(1.0, 0.0, 0.0, mu).rotate(phi) / mu
+        return profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi) / mu
 
 
 class CircularOrbitalObject(OrbitalObject):
