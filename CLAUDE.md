@@ -2,38 +2,36 @@
 
 This repository contains `metroid`, a Python library to simulate streaks and trails in astronomical images that are caused by orbital objects such as satellites and space debris. This document contains critical information about working with this codebase. Follow these guidelines precisely.
 
-## Core Development Rules
+## Convention Hierarchy
 
-1. Development Philosophy
-  - **Simplicity**: Write simple, straightforward code
-  - **Readability**: Make code easy to understand
-  - **Performance**: Consider performance without sacrificing readability
-  - **Maintainability**: Write code that's easy to update
-  - **Testability**: Ensure code is testable
-  - **Reusability**: Create reusable components and functions
-  - **Less Code = Less Debt**: Minimize code footprint
+When sources conflict, follow this precedence (higher overrides lower):
 
-2. Code Style
-  - Modern type hints required for all code
-  - PEP 8
-  - Class names in PascalCase
-  - Constants in UPPER_SNAKE_CASE
-  - Document with docstrings
-  - Line length: 110 chars maximum
-  - Lines that intentionally deviate from PEP 8 must include a `noqa` comment with flake8 error code
+| Tier | Source                              | Override Scope                |
+| ---- | ----------------------------------- | ----------------------------- |
+| 1    | Explicit user instruction           | Override all below            |
+| 2    | Project docs (CLAUDE.md, README.md) | Override conventions/defaults |
+| 3    | Universal best practices            | Confirm if uncertain          |
 
-3. Documenting Python APIs
-  - PEP 257
-  - Numpydoc Style 
-  - Docstring line length: 79 chars maximum
+**Conflict resolution**: Lower tier numbers win. Subdirectory docs override root docs for that subtree.
 
-## Python Tools
+## Knowledge Strategy
 
-  - use `black` to fix PEP 8
-  - use `mypy` for static type checking
-  - use `pytest` for unit tests
+**CLAUDE.md** = navigation index (WHAT is here, WHEN to read)
+**README.md** = invisible knowledge (WHY it's structured this way)
 
-## Git Workflow
+## Core Workflow
+
+All tasks should be performed within the scope of the Git Workflow. The generalized pattern is
+
+1. Parse task; retrieve additional context only for determining the scope of the task.
+2. Stage within git workflow
+2. Plan
+3. Implement
+4. Evaluate
+5. Document
+6. Finalize within git workflow
+
+### Git Workflow
 
 - Always use feature branches; do not commit directly to `main`
   - Name branches descriptively: `fix/auth-timeout`, `documentation/code_examples`, `feature/api-pagination`
@@ -56,6 +54,14 @@ This repository contains `metroid`, a Python library to simulate streaks and tra
   4. Open a draft PR early
   5. Convert to ready PR when functionally complete and tests pass
   6. Never merge automatically, always prompt first
+
+## Tools
+
+## Python Tools
+
+- use `black` to fix PEP 8 (this is the authoritative source for formatting)
+- use `mypy` for static type checking
+- use `pytest` for unit tests
 
 ## Repository Layout:
 
