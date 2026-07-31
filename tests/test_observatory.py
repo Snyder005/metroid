@@ -2,13 +2,14 @@
 
 from astropy import units as u
 from astropy.coordinates import EarthLocation
+import galsim
 import numpy as np
 import pytest
 
 from metroid.camera import Camera
 from metroid.observatory import Observatory
 from metroid.photometry import PhotometricParameters, ThroughputCurve
-from metroid.profiles import CircularPupil
+from metroid.profiles import CircularOrbitalObject, CircularPupil
 
 
 @pytest.fixture
@@ -103,6 +104,57 @@ def test_get_photo_params_invalid_exptime(observatory, exptime, expected_error):
     """A bad exposure-time type or unit raises."""
     with pytest.raises(expected_error):
         observatory.get_photo_params(exptime)
+
+
+# ---------------------------------------------------------------------------
+# track_satellite
+# ---------------------------------------------------------------------------
+
+
+def test_track_satellite_matches_object_level(observatory):
+    """track_satellite routes through the tracked object-level method."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, observed_magnitude=18.0)
+    psf = galsim.Gaussian(sigma=0.5)
+    throughput = observatory.camera["lsst2023-u"]
+    photo_params = observatory.get_photo_params(30.0 * u.s)
+
+    expected = obj.get_scaled_tracked_profile(throughput, photo_params, psf, observatory.pupil, 18.0)
+    result = observatory.track_satellite(obj, "lsst2023-u", 30.0 * u.s, psf, 18.0)
+    assert np.isclose(result.flux, expected.flux)
+
+
+def test_track_satellite_uses_observed_magnitude(observatory):
+    """With no brightness_spec, the object's observed magnitude is used."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, observed_magnitude=18.0)
+    psf = galsim.Gaussian(sigma=0.5)
+    photo_params = observatory.get_photo_params(30.0 * u.s)
+    expected = observatory.camera["lsst2023-u"].calculate_adu(obj.observed_magnitude, photo_params)
+    # A tracked profile through a circular pupil integrates to the same ADU
+    # total (withFlux applied after convolution).
+    result = observatory.track_satellite(obj, "lsst2023-u", 30.0 * u.s, psf)
+    assert np.isclose(result.flux, expected.to_value(u.adu))
+
+
+def test_track_satellite_unknown_band(observatory):
+    """An unknown bandpass name raises ValueError."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, observed_magnitude=18.0)
+    psf = galsim.Gaussian(sigma=0.5)
+    with pytest.raises(ValueError):
+        observatory.track_satellite(obj, "no-such-band", 30.0 * u.s, psf, 18.0)
+
+
+def test_track_satellite_bad_object(observatory):
+    """A non-OrbitalObject argument raises TypeError."""
+    psf = galsim.Gaussian(sigma=0.5)
+    with pytest.raises(TypeError):
+        observatory.track_satellite("not an object", "lsst2023-u", 30.0 * u.s, psf, 18.0)
+
+
+def test_track_satellite_bad_psf(observatory):
+    """A non-GSObject psf raises TypeError (psf is required)."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, observed_magnitude=18.0)
+    with pytest.raises(TypeError):
+        observatory.track_satellite(obj, "lsst2023-u", 30.0 * u.s, "not a psf", 18.0)
 
 
 # ---------------------------------------------------------------------------

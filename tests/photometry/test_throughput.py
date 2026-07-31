@@ -126,6 +126,45 @@ def test_calculate_ab_magnitude_of_reference_is_zero(bandpass):
     assert np.isclose(bandpass.calculate_ab_magnitude(Sed.for_ab_magnitudes()), 0.0)
 
 
+@pytest.mark.parametrize("magnitude", [0.0, 12.0, 18.5, 24.0])
+def test_calculate_ab_magnitude_from_adu_round_trip(bandpass, magnitude):
+    """calculate_ab_magnitude_from_adu inverts calculate_adu."""
+    photo_params = PhotometricParameters(15.0 * u.s, 2.0 * u.electron / u.adu, 35.0 * u.m**2)
+    adu = bandpass.calculate_adu(magnitude, photo_params)
+    assert np.isclose(bandpass.calculate_ab_magnitude_from_adu(adu, photo_params), magnitude)
+
+
+def test_calculate_ab_magnitude_from_adu_monotonic(bandpass):
+    """A smaller (brighter) magnitude corresponds to a larger ADU."""
+    photo_params = PhotometricParameters(1.0 * u.s, 1.0 * u.electron / u.adu, 1.0 * u.m**2)
+    bright = bandpass.calculate_adu(15.0, photo_params)
+    faint = bandpass.calculate_adu(20.0, photo_params)
+    assert bright > faint
+    assert bandpass.calculate_ab_magnitude_from_adu(bright, photo_params) < (
+        bandpass.calculate_ab_magnitude_from_adu(faint, photo_params)
+    )
+
+
+def test_calculate_ab_magnitude_from_adu_non_positive_rejected(bandpass):
+    """A non-positive ADU raises ValueError."""
+    photo_params = PhotometricParameters(1.0 * u.s, 1.0 * u.electron / u.adu, 1.0 * u.m**2)
+    with pytest.raises(ValueError):
+        bandpass.calculate_ab_magnitude_from_adu(0.0 * u.adu, photo_params)
+
+
+def test_calculate_ab_magnitude_from_adu_bad_unit_rejected(bandpass):
+    """A non-ADU quantity raises (unit enforcement)."""
+    photo_params = PhotometricParameters(1.0 * u.s, 1.0 * u.electron / u.adu, 1.0 * u.m**2)
+    with pytest.raises(Exception):
+        bandpass.calculate_ab_magnitude_from_adu(5.0 * u.m, photo_params)
+
+
+def test_calculate_ab_magnitude_from_adu_bad_photo_params(bandpass):
+    """A non-PhotometricParameters argument raises TypeError."""
+    with pytest.raises(TypeError):
+        bandpass.calculate_ab_magnitude_from_adu(5.0 * u.adu, "not photo params")
+
+
 def test_int_magnitude_supported(bandpass):
     """Regression for #20: int AB magnitudes agree with the float equivalent."""
     assert u.isclose(bandpass.calculate_photon_flux(20), bandpass.calculate_photon_flux(20.0))

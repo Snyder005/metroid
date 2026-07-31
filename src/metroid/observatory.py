@@ -3,14 +3,17 @@ from __future__ import annotations
 from typing import Any
 
 import astropy.units as u
+import galsim
 from astropy.coordinates import EarthLocation
 
 from metroid.camera import Camera
-from metroid.profiles.pupils import Pupil
 from metroid.photometry.photo_params import PhotometricParameters
+from metroid.photometry.sed import Sed
+from metroid.profiles.orbital_objects import OrbitalObject
+from metroid.profiles.pupils import Pupil
 from metroid.utils.config import load_standard_catalogue
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Time
+from metroid.utils.quantities import Scalar, Time
 
 
 class Observatory:
@@ -159,3 +162,69 @@ class Observatory:
             exptime=exptime, gain=self.camera.gain, area=self.pupil.area, qe=self.camera.qe
         )
         return photo_params
+
+    @enforce_units
+    def track_satellite(
+        self,
+        orbital_object: OrbitalObject,
+        band: str,
+        exptime: Time[Scalar],
+        psf: galsim.GSObject,
+        brightness_spec: float | int | Sed | None = None,
+    ) -> galsim.GSObject:
+        """Get the satellite as it appears in a tracked image.
+
+        Returns the object's scaled, tracked surface-brightness profile: what
+        the satellite looks like in an image where the telescope tracks it,
+        under this observatory's bandpass, pupil, and the supplied exposure and
+        PSF. A ``psf`` is required because a real observatory always focuses at
+        infinity through an intervening atmosphere and therefore never sees the
+        bare, unconvolved profile; the unconvolved profile is a lab
+        observation, available directly from `OrbitalObject.get_scaled_profile`.
+
+        A convenience wrapper: it resolves the observation's bandpass and
+        photometric parameters from this observatory and delegates the flux
+        scaling to the object itself. The identical result can be obtained
+        directly from `OrbitalObject.get_scaled_tracked_profile`, which is
+        useful for studying a profile without constructing an `Observatory`.
+
+        The complementary observation -- a satellite passing through an image
+        and leaving a trail rather than being tracked -- is future work and
+        would be exposed as ``observe_satellite``.
+
+        Parameters
+        ----------
+        orbital_object : `metroid.profiles.OrbitalObject`
+            The object to observe.
+        band : `str`
+            The camera bandpass name.
+        exptime : `astropy.units.Quantity`
+            The exposure time.
+        psf : `galsim.GSObject`
+            The point-spread function to convolve with.
+        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+            The brightness specification: an AB magnitude or an object SED. If
+            `None` (the default), the object's ``observed_magnitude`` is used.
+
+        Returns
+        -------
+        profile : `galsim.GSObject`
+            The scaled, tracked profile.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``orbital_object`` is not an `OrbitalObject`, or if
+            ``psf`` is not a `galsim.GSObject`.
+        ValueError
+            Raised if ``band`` is not a known bandpass.
+        """
+        if not isinstance(orbital_object, OrbitalObject):
+            raise TypeError("orbital_object must be 'metroid.profiles.OrbitalObject'")
+
+        throughput = self.camera[band]
+        photo_params = self.get_photo_params(exptime)
+
+        return orbital_object.get_scaled_tracked_profile(
+            throughput, photo_params, psf, self.pupil, brightness_spec
+        )
