@@ -6,7 +6,12 @@ import galsim
 import numpy as np
 import pytest
 
-from metroid.profiles.orbital_objects import CircularOrbitalObject, RectangularOrbitalObject
+from metroid.profiles.components import CircularComponent, RectangularComponent
+from metroid.profiles.orbital_objects import (
+    CircularOrbitalObject,
+    CompositeOrbitalObject,
+    RectangularOrbitalObject,
+)
 from metroid.profiles.pupils import CircularPupil
 
 
@@ -299,3 +304,67 @@ def test_degenerate_geometry_allows_only_zero_pointing_angle():
     assert obj.pointing_angle == 0.0 * u.deg
     with pytest.raises(ValueError):
         obj.pointing_angle = 1.0 * u.deg
+
+
+# ---------------------------------------------------------------------------
+# CompositeOrbitalObject
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def composite_object():
+    """A CompositeOrbitalObject with a bright bus and a dim panel."""
+    bus = RectangularComponent(2.0 * u.m, 2.0 * u.m, reflectivity=0.8 * u.dimensionless_unscaled)
+    panel = RectangularComponent(
+        1.0 * u.m, 4.0 * u.m, x0=3.0 * u.m, reflectivity=0.3 * u.dimensionless_unscaled
+    )
+    return CompositeOrbitalObject(550.0 * u.km, 70.0 * u.deg, [bus, panel])
+
+
+def test_composite_stores_components(composite_object):
+    """Components are stored as an immutable tuple."""
+    assert isinstance(composite_object.components, tuple)
+    assert len(composite_object.components) == 2
+
+
+def test_composite_rejects_empty_components():
+    """An empty component sequence raises ValueError."""
+    with pytest.raises(ValueError):
+        CompositeOrbitalObject(550.0 * u.km, 70.0 * u.deg, [])
+
+
+def test_composite_rejects_non_component():
+    """A non-Component element raises TypeError."""
+    with pytest.raises(TypeError):
+        CompositeOrbitalObject(550.0 * u.km, 70.0 * u.deg, ["not a component"])
+
+
+def test_composite_area_is_sum_of_component_areas(composite_object):
+    """The composite area equals the sum of its component areas."""
+    expected = sum((c.area for c in composite_object.components), 0.0 * u.m**2)
+    assert u.isclose(composite_object.area, expected)
+
+
+def test_composite_profile_is_projected_gsobject(composite_object):
+    """The composite profile is a projected GSObject."""
+    assert isinstance(composite_object.profile, galsim.GSObject)
+
+
+def test_composite_profile_flux_is_sum_of_component_fluxes(composite_object):
+    """galsim.Sum preserves flux: composite flux == sum of relative fluxes."""
+    expected = sum(c.relative_flux() for c in composite_object.components)
+    assert composite_object.profile.flux == pytest.approx(expected)
+
+
+def test_composite_get_tracked_profile(composite_object):
+    """get_tracked_profile is a drop-in with the primitives."""
+    psf = galsim.Kolmogorov(fwhm=0.7)
+    pupil = CircularPupil(4.0 * u.m)
+    assert isinstance(composite_object.get_tracked_profile(psf, pupil), galsim.Convolution)
+
+
+def test_composite_inherits_orbital_mechanics(composite_object):
+    """The composite shares OrbitalObject geometry (distance, nadir angle)."""
+    reference = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 1.0 * u.m)
+    assert u.isclose(composite_object.distance, reference.distance)
+    assert u.isclose(composite_object.nadir_angle, reference.nadir_angle)
