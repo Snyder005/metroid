@@ -16,6 +16,7 @@ dependencies = [
     "astropy",
     "galsim",
     "speclite",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,9 @@ dev = ["black", "pytest"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"metroid.data" = ["*.yaml"]
 
 [tool.black]
 line-length = 110

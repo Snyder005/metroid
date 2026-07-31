@@ -1,90 +1,25 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Self
+from typing import Self
 
 import astropy.units as u
 import galsim
 import numpy as np
 
+from ..utils.config import Registrable
 from ..utils.validation import get_field_value
 from ..utils.decorators import enforce_units
 from ..utils.quantities import Area, GeometryLength, OrbitalDistance, Scalar
 
 
-class Pupil(ABC):
-    """Abstract base class for telescope pupils."""
+class Pupil(Registrable, ABC, registry_label="pupil"):
+    """Abstract base class for telescope pupils.
 
-    _registry: ClassVar[dict[str, type[Pupil]]] = {}
-    """The registry of Pupil subclasses."""
-
-    def __init_subclass__(cls, pupil_type: str | None = None, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if pupil_type:
-            cls._registry[pupil_type] = cls
-
-    @classmethod
-    def from_config(cls, config: dict[str, str | float]) -> Pupil:
-        """Create an instance of a specific subclass of `Pupil` from a
-        configuration dictionary.
-
-        This class method defines a standardized way to construct an instance
-        of a subclass that is specified in the configuration. It is intended
-        for creating an instance from a JSON file that contains a "pupil"
-        section.
-
-        Parameters
-        ----------
-        config : `dict`
-            A configuration dictionary of fields each consisting of a name
-            (`str`) and value (`str` or `float`). A required field is:
-
-            ``"type"``
-                The child class pupil type (`str`).
-
-        Returns
-        -------
-        pupil : `Pupil`
-            An instance of a subclass of `Pupil` initialized with the
-            configuration values.
-
-        Raises
-        ------
-        ValueError
-            Raised if a required field does not exist or if the pupil type is
-            unknown.
-        """
-        config = config.copy()
-        try:
-            pupil_type = config.pop("type")
-        except KeyError:
-            raise ValueError("config is missing required field 'type'") from None
-
-        try:
-            subcls = cls._registry[pupil_type]
-        except KeyError:
-            raise ValueError(f"unknown pupil type: {pupil_type}") from None
-
-        return subcls._from_config(config)
-
-    @classmethod
-    @abstractmethod
-    def _from_config(cls, config: dict[str, float]) -> Self:
-        """Create an instance of a subclass of `Pupil` from a configuration
-        dictionary.
-
-        Parameters
-        ----------
-        config : `dict` [`str`, `float`]
-            A configuration dictionary of fields.
-
-        Returns
-        -------
-        pupil : `Pupil`
-            An instance of a subclass of `Pupil` initialized with the
-            configuration.
-        """
-        pass
+    Subclasses register themselves for `from_config` dispatch by passing
+    ``type="<name>"`` to their class statement (see
+    `metroid.utils.config.Registrable`).
+    """
 
     @property
     @abstractmethod
@@ -112,7 +47,7 @@ class Pupil(ABC):
         pass
 
 
-class CircularPupil(Pupil, pupil_type="circular"):
+class CircularPupil(Pupil, type="circular"):
     """A circular telescope pupil."""
 
     @enforce_units
@@ -187,7 +122,7 @@ class CircularPupil(Pupil, pupil_type="circular"):
         return galsim.TopHat(r)
 
 
-class AnnularPupil(Pupil, pupil_type="annular"):
+class AnnularPupil(Pupil, type="annular"):
     """An annular telescope pupil."""
 
     @enforce_units

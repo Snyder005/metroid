@@ -103,3 +103,54 @@ def test_get_photo_params_invalid_exptime(observatory, exptime, expected_error):
     """A bad exposure-time type or unit raises."""
     with pytest.raises(expected_error):
         observatory.get_photo_params(exptime)
+
+
+# ---------------------------------------------------------------------------
+# from_config
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def observatory_config():
+    """A configuration dict composing camera, pupil, and location blocks."""
+    return {
+        "camera": {"bandpasses": ["lsst2023-r"], "gain": 1.6, "pixel_scale": 0.2},
+        "pupil": {"type": "circular", "radius": 4.0},
+        "location": {"lat": -30.2446, "lon": -70.7494, "height": 2647.0},
+    }
+
+
+def test_from_config_composes_components(observatory_config):
+    """from_config builds the camera, pupil, and location from nested blocks."""
+    observatory = Observatory.from_config(observatory_config)
+    assert isinstance(observatory.camera, Camera)
+    assert isinstance(observatory.pupil, CircularPupil)
+    assert observatory.pupil.radius == 4.0 * u.m
+    assert observatory.location.lat.to_value(u.deg) == pytest.approx(-30.2446)
+
+
+def test_from_config_get_photo_params(observatory_config):
+    """An Observatory built from config produces valid photometric parameters."""
+    observatory = Observatory.from_config(observatory_config)
+    photo_params = observatory.get_photo_params(30.0 * u.s)
+    assert isinstance(photo_params, PhotometricParameters)
+
+
+# ---------------------------------------------------------------------------
+# from_standard (bundled catalogue)
+# ---------------------------------------------------------------------------
+
+
+def test_from_standard_rubin():
+    """from_standard('rubin') builds a full Observatory from the catalogue."""
+    observatory = Observatory.from_standard("rubin")
+    assert set(observatory.camera.filter_names) == {"u", "g", "r", "i", "z", "y"}
+    assert observatory.pupil.area.unit.is_equivalent(u.m**2)
+    photo_params = observatory.get_photo_params(30.0 * u.s)
+    assert isinstance(photo_params, PhotometricParameters)
+
+
+def test_from_standard_unknown_name_raises():
+    """An unknown standard name raises ValueError."""
+    with pytest.raises(ValueError):
+        Observatory.from_standard("does-not-exist")
