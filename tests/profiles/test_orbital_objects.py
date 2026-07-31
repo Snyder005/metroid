@@ -39,11 +39,11 @@ def orbital_object(request):
 
 @pytest.mark.parametrize("orbital_object", ["circular_object", "rectangular_object"], indirect=True)
 def test_stored_attributes(orbital_object):
-    """Height, zenith/rotation angle, and nadir flag are stored."""
+    """Height, zenith/rotation angle, and pointing angle are stored."""
     assert orbital_object.height == 550.0 * u.km
     assert orbital_object.zenith_angle == 70.0 * u.deg
     assert orbital_object.rotation_angle == 0.0 * u.deg
-    assert orbital_object.nadir_pointing is False
+    assert orbital_object.pointing_angle == 0.0 * u.deg
 
 
 def test_construction_bad_height_unit():
@@ -79,16 +79,30 @@ def test_height_setter_validates_unit(circular_object):
         circular_object.height = 600.0 * u.s
 
 
-def test_nadir_pointing_setter_rejects_non_bool(circular_object):
-    """The nadir_pointing setter rejects a non-bool value."""
+def test_pointing_angle_setter_updates_value(circular_object):
+    """The pointing_angle setter accepts a value within [0, nadir_angle]."""
+    circular_object.pointing_angle = circular_object.nadir_angle
+    assert u.isclose(circular_object.pointing_angle, circular_object.nadir_angle)
+
+
+def test_pointing_angle_setter_rejects_out_of_range(circular_object):
+    """The pointing_angle setter rejects values outside [0, nadir_angle]."""
     with pytest.raises(ValueError):
-        circular_object.nadir_pointing = "yes"
+        circular_object.pointing_angle = -1.0 * u.deg
+    with pytest.raises(ValueError):
+        circular_object.pointing_angle = circular_object.nadir_angle + 5.0 * u.deg
 
 
-def test_nadir_pointing_setter_accepts_bool(circular_object):
-    """The nadir_pointing setter accepts a bool."""
-    circular_object.nadir_pointing = True
-    assert circular_object.nadir_pointing is True
+def test_pointing_angle_setter_rejects_bad_unit(circular_object):
+    """The pointing_angle setter rejects an incompatible unit."""
+    with pytest.raises(ValueError):
+        circular_object.pointing_angle = 1.0 * u.s
+
+
+def test_construction_rejects_out_of_range_pointing_angle():
+    """Constructing with a pointing_angle outside [0, nadir_angle] raises."""
+    with pytest.raises(ValueError):
+        CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, pointing_angle=200.0 * u.deg)
 
 
 # ---------------------------------------------------------------------------
@@ -190,19 +204,11 @@ def test_circular_object_radius_and_area(circular_object):
     assert u.isclose(circular_object.area, np.pi * (3.0 * u.m) ** 2)
 
 
-def test_circular_object_profile(circular_object):
-    """The profile is a TopHat sized by radius/distance in arcsec."""
-    expected_radius = (circular_object.radius / circular_object.distance).to_value(
-        u.arcsec, equivalencies=u.dimensionless_angles()
-    )
-    assert isinstance(circular_object.profile, galsim.TopHat)
-    assert circular_object.profile.radius == pytest.approx(expected_radius)
-
-
-def test_circular_object_nadir_pointing_projects_profile():
-    """A nadir-pointing circular object returns a transformed profile."""
-    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, nadir_pointing=True)
-    assert isinstance(obj.profile, galsim.GSObject)
+def test_circular_object_profile_is_projected(circular_object):
+    """The profile is a projected GSObject built from a radius/distance TopHat."""
+    assert isinstance(circular_object.profile, galsim.GSObject)
+    # Flux is conserved by the projection (the ``/ mu`` term).
+    assert circular_object.profile.flux == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -217,20 +223,79 @@ def test_rectangular_object_dimensions_and_area(rectangular_object):
     assert u.isclose(rectangular_object.area, (2.0 * u.m) * (4.0 * u.m))
 
 
-def test_rectangular_object_profile(rectangular_object):
-    """The profile is a Box sized by width/length over distance in arcsec."""
-    expected_width = (rectangular_object.width / rectangular_object.distance).to_value(
-        u.arcsec, equivalencies=u.dimensionless_angles()
-    )
-    expected_length = (rectangular_object.length / rectangular_object.distance).to_value(
-        u.arcsec, equivalencies=u.dimensionless_angles()
-    )
-    assert isinstance(rectangular_object.profile, galsim.Box)
-    assert rectangular_object.profile.width == pytest.approx(expected_width)
-    assert rectangular_object.profile.height == pytest.approx(expected_length)
+def test_rectangular_object_profile_is_projected(rectangular_object):
+    """The profile is a projected GSObject built from a width/length Box."""
+    assert isinstance(rectangular_object.profile, galsim.GSObject)
+    # Flux is conserved by the projection (the ``/ mu`` term).
+    assert rectangular_object.profile.flux == pytest.approx(1.0)
 
 
-def test_rectangular_object_nadir_pointing_projects_profile():
-    """A nadir-pointing rectangular object returns a transformed profile."""
-    obj = RectangularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 2.0 * u.m, 4.0 * u.m, nadir_pointing=True)
-    assert isinstance(obj.profile, galsim.GSObject)
+# ---------------------------------------------------------------------------
+# Continuous pointing angle projection
+# ---------------------------------------------------------------------------
+
+
+def _projection_extent(profile):
+    """The flux-weighted RMS extent of a profile along the projection axis.
+
+    The projection foreshortens along the (unrotated) x-axis by ``mu``, so a
+    smaller extent means stronger foreshortening.
+    """
+    image = profile.drawImage(scale=0.02, method="no_pixel", nx=400, ny=400)
+    array = np.clip(image.array, 0.0, None)
+    xs = np.mgrid[0 : array.shape[0], 0 : array.shape[1]][1]
+    total = array.sum()
+    centroid = (array * xs).sum() / total
+    return np.sqrt((array * (xs - centroid) ** 2).sum() / total)
+
+
+def test_observatory_extreme_matches_unprojected():
+    """At pointing_angle == nadir_angle the projection is the identity (mu == 1)."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    obj.pointing_angle = obj.nadir_angle
+
+    r = (obj.radius / obj.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+    unprojected = galsim.TopHat(r)
+
+    reference = unprojected.drawImage(scale=0.05, method="no_pixel")
+    projected = obj.profile.drawImage(
+        scale=0.05, method="no_pixel", nx=reference.array.shape[1], ny=reference.array.shape[0]
+    )
+    assert np.allclose(projected.array, reference.array, atol=1e-6)
+
+
+def test_nadir_extreme_is_foreshortened():
+    """At the default pointing_angle == 0 the profile is foreshortened (mu < 1)."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+
+    r = (obj.radius / obj.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+    unprojected = galsim.TopHat(r)
+
+    assert _projection_extent(obj.profile) < _projection_extent(unprojected)
+
+
+def test_pointing_angle_monotonic_foreshortening():
+    """Foreshortening relaxes monotonically from nadir toward the observatory."""
+    nadir = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    nadir_angle = nadir.nadir_angle
+
+    intermediate = CircularOrbitalObject(
+        550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, pointing_angle=nadir_angle / 2
+    )
+    observatory = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, pointing_angle=nadir_angle)
+
+    extents = [
+        _projection_extent(nadir.profile),
+        _projection_extent(intermediate.profile),
+        _projection_extent(observatory.profile),
+    ]
+    assert extents[0] < extents[1] < extents[2]
+
+
+def test_degenerate_geometry_allows_only_zero_pointing_angle():
+    """At zenith_angle == 0 the nadir_angle is 0, so only pointing_angle == 0 is valid."""
+    obj = CircularOrbitalObject(550.0 * u.km, 0.0 * u.deg, 3.0 * u.m)
+    assert u.isclose(obj.nadir_angle, 0.0 * u.deg, atol=1e-12 * u.deg)
+    assert obj.pointing_angle == 0.0 * u.deg
+    with pytest.raises(ValueError):
+        obj.pointing_angle = 1.0 * u.deg
