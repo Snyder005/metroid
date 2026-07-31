@@ -30,12 +30,14 @@ class OrbitalObject(ABC):
         height: OrbitalDistance[Scalar],
         zenith_angle: Angle[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
-        nadir_pointing: bool = False,
+        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
     ):
         self.height = height
         self.zenith_angle = zenith_angle
         self.rotation_angle = rotation_angle
-        self.nadir_pointing = nadir_pointing
+        # Assign last: the pointing_angle setter validates against nadir_angle,
+        # which is derived from height and zenith_angle.
+        self.pointing_angle = pointing_angle
 
     @property
     @enforce_units
@@ -77,16 +79,28 @@ class OrbitalObject(ABC):
         self._rotation_angle = quantity
 
     @property
-    def nadir_pointing(self) -> bool:
-        """`True` if object is nadir pointing, `False` otherwise (`bool`)."""
-        return self._nadir_pointing
+    @enforce_units
+    def pointing_angle(self) -> Angle[Scalar]:
+        """The pointing angle of the object, measured from its nadir direction
+        toward the telescope line of sight, in degrees
+        (`astropy.units.Quantity`).
 
-    @nadir_pointing.setter
-    def nadir_pointing(self, value: bool) -> None:
-        if not isinstance(value, bool):
-            raise ValueError("nadir_pointing must be 'bool'")
+        The physically meaningful range is ``[0, nadir_angle]``:
+        ``0 deg`` (the default) is nadir-pointing and ``nadir_angle`` is
+        observatory-pointing (face-on to the telescope).
+        """
+        return self._pointing_angle
 
-        self._nadir_pointing = value
+    @pointing_angle.setter
+    @enforce_units
+    def pointing_angle(self, quantity: Angle[Scalar]) -> None:
+        nadir_angle = self.nadir_angle
+        if not (0.0 * u.deg <= quantity <= nadir_angle):
+            raise ValueError(
+                f"pointing_angle must be within [0 deg, {nadir_angle.to(u.deg)}], got {quantity.to(u.deg)}"
+            )
+
+        self._pointing_angle = quantity
 
     @property
     @enforce_units
@@ -238,7 +252,7 @@ class OrbitalObject(ABC):
         projected_profile: `galsim.Transformation`
             The transformed surface brightness profile.
         """
-        mu = np.cos(self.nadir_angle)
+        mu = np.cos(self.nadir_angle - self.pointing_angle)
         phi = galsim.Angle(self.rotation_angle.to_value(u.deg), unit=galsim.degrees)
 
         return profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi) / mu
@@ -254,9 +268,9 @@ class CircularOrbitalObject(OrbitalObject):
         zenith_angle: Angle[Scalar],
         radius: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
-        nadir_pointing: bool = False,
+        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
         self._radius = radius
 
     @property
@@ -268,18 +282,14 @@ class CircularOrbitalObject(OrbitalObject):
         return self._radius
 
     @property
-    def profile(self) -> galsim.TopHat:
-        """The surface brightness profile of the object (`galsim.TopHat`,
-        read-only).
+    def profile(self) -> galsim.Transformation:
+        """The surface brightness profile of the object, foreshortened by the
+        pointing-angle projection (`galsim.Transformation`, read-only).
         """
         r = (self.radius / self.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.TopHat(r)
 
-        if self.nadir_pointing:
-            return self._project(profile)
-
-        else:
-            return profile
+        return self._project(profile)
 
     @property
     @enforce_units
@@ -301,9 +311,9 @@ class RectangularOrbitalObject(OrbitalObject):
         width: GeometryLength[Scalar],
         length: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
-        nadir_pointing: bool = False,
+        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, nadir_pointing)
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
         self._width = width
         self._length = length
 
@@ -324,19 +334,15 @@ class RectangularOrbitalObject(OrbitalObject):
         return self._length
 
     @property
-    def profile(self) -> galsim.Box:
-        """The surface brightness profile of the object (`galsim.Box`,
-        read-only).
+    def profile(self) -> galsim.Transformation:
+        """The surface brightness profile of the object, foreshortened by the
+        pointing-angle projection (`galsim.Transformation`, read-only).
         """
         w = (self.width / self.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         l = (self.length / self.distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         profile = galsim.Box(w, l)
 
-        if self.nadir_pointing:
-            return self._project(profile)
-
-        else:
-            return profile
+        return self._project(profile)
 
     @property
     @enforce_units
