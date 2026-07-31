@@ -1,0 +1,25 @@
+# Catalogue of standard observatory definitions.
+#
+# Each top-level key is an object name/label resolvable via
+# ``Observatory.from_standard(name)``. Numeric fields carry bare values in
+# each field's documented canonical unit (see the relevant ``from_config``
+# docstring); there is no {value, unit} wrapper.
+
+rubin:
+  camera:
+    # A speclite group wildcard loads the whole filter complement in one line;
+    # each band is keyed by its trailing letter (u, g, r, i, z, y).
+    bandpasses: "lsst2023-*"
+    gain: 1.6          # electrons per ADU
+    pixel_scale: 0.2   # arcseconds per pixel
+    qe: 0.9            # electrons per photon
+  pupil:
+    type: annular
+    inner_radius: 2.5  # meters
+    outer_radius: 4.18 # meters
+  location:
+    # Cerro Pachon, Chile (Vera C. Rubin Observatory). Explicit lat/lon/height
+    # is used rather than of_site so the catalogue resolves offline.
+    lat: -30.2446      # degrees
+    lon: -70.7494      # degrees
+    height: 2647.0     # meters
