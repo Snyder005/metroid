@@ -3,14 +3,17 @@ from __future__ import annotations
 from typing import Any
 
 import astropy.units as u
+import galsim
 from astropy.coordinates import EarthLocation
 
 from metroid.camera import Camera
-from metroid.profiles.pupils import Pupil
 from metroid.photometry.photo_params import PhotometricParameters
+from metroid.photometry.sed import Sed
+from metroid.profiles.orbital_objects import OrbitalObject
+from metroid.profiles.pupils import Pupil
 from metroid.utils.config import load_standard_catalogue
 from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Time
+from metroid.utils.quantities import Scalar, Time
 
 
 class Observatory:
@@ -159,3 +162,63 @@ class Observatory:
             exptime=exptime, gain=self.camera.gain, area=self.pupil.area, qe=self.camera.qe
         )
         return photo_params
+
+    @enforce_units
+    def get_scaled_profile(
+        self,
+        orbital_object: OrbitalObject,
+        band: str,
+        exptime: Time[Scalar],
+        brightness_spec: float | int | Sed | None = None,
+        psf: galsim.GSObject | None = None,
+    ) -> galsim.GSObject:
+        """Get an orbital object's profile scaled to its absolute ADU flux.
+
+        A convenience wrapper that resolves the observation's bandpass and
+        photometric parameters from this observatory and delegates the flux
+        scaling to the object itself. When a ``psf`` is supplied the tracked
+        (convolved) profile is returned, using this observatory's pupil;
+        otherwise the bare profile is returned. The identical scaling can be
+        obtained directly from the `OrbitalObject` methods, which is useful for
+        studying a profile without constructing an `Observatory`.
+
+        Parameters
+        ----------
+        orbital_object : `metroid.profiles.OrbitalObject`
+            The object to observe.
+        band : `str`
+            The camera bandpass name.
+        exptime : `astropy.units.Quantity`
+            The exposure time.
+        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+            The brightness specification: an AB magnitude or an object SED. If
+            `None` (the default), the object's ``observed_magnitude`` is used.
+        psf : `galsim.GSObject` or `None`
+            A point-spread function. If given, the tracked profile is returned;
+            otherwise the bare profile is returned.
+
+        Returns
+        -------
+        profile : `galsim.GSObject`
+            The scaled (and, if ``psf`` is given, tracked) profile.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``orbital_object`` is not an `OrbitalObject`.
+        ValueError
+            Raised if ``band`` is not a known bandpass, or if
+            ``brightness_spec`` is `None` and the object has no magnitude.
+        """
+        if not isinstance(orbital_object, OrbitalObject):
+            raise TypeError("orbital_object must be 'metroid.profiles.OrbitalObject'")
+
+        throughput = self.camera[band]
+        photo_params = self.get_photo_params(exptime)
+
+        if psf is None:
+            return orbital_object.get_scaled_profile(throughput, photo_params, brightness_spec)
+
+        return orbital_object.get_scaled_tracked_profile(
+            throughput, photo_params, psf, self.pupil, brightness_spec
+        )

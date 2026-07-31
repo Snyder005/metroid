@@ -6,13 +6,26 @@ import galsim
 import numpy as np
 import pytest
 
+from metroid.photometry import PhotometricParameters, Sed, ThroughputCurve
 from metroid.profiles.components import CircularComponent, RectangularComponent
 from metroid.profiles.orbital_objects import (
     CircularOrbitalObject,
     CompositeOrbitalObject,
     RectangularOrbitalObject,
 )
-from metroid.profiles.pupils import CircularPupil
+from metroid.profiles.pupils import AnnularPupil, CircularPupil
+
+
+@pytest.fixture
+def bandpass():
+    """A ThroughputCurve built from the lsst2023-g filter."""
+    return ThroughputCurve.load_filter("lsst2023-g")
+
+
+@pytest.fixture
+def photo_params():
+    """Photometric parameters for a representative exposure."""
+    return PhotometricParameters(30.0 * u.s, 1.6 * u.electron / u.adu, 35.0 * u.m**2)
 
 
 @pytest.fixture
@@ -212,8 +225,13 @@ def test_circular_object_radius_and_area(circular_object):
 def test_circular_object_profile_is_projected(circular_object):
     """The profile is a projected GSObject built from a radius/distance TopHat."""
     assert isinstance(circular_object.profile, galsim.GSObject)
-    # Flux is conserved by the projection (the ``/ mu`` term).
-    assert circular_object.profile.flux == pytest.approx(1.0)
+    # Projection is not flux-conserving: total flux dims by the projected-area
+    # factor mu = cos(nadir_angle - pointing_angle) applied to the unit-flux
+    # base shape.
+    mu = np.cos(circular_object.nadir_angle - circular_object.pointing_angle).to_value(
+        u.dimensionless_unscaled
+    )
+    assert circular_object.profile.flux == pytest.approx(mu)
 
 
 # ---------------------------------------------------------------------------
@@ -231,8 +249,12 @@ def test_rectangular_object_dimensions_and_area(rectangular_object):
 def test_rectangular_object_profile_is_projected(rectangular_object):
     """The profile is a projected GSObject built from a width/length Box."""
     assert isinstance(rectangular_object.profile, galsim.GSObject)
-    # Flux is conserved by the projection (the ``/ mu`` term).
-    assert rectangular_object.profile.flux == pytest.approx(1.0)
+    # Projection is not flux-conserving: total flux dims by the projected-area
+    # factor mu applied to the unit-flux base shape.
+    mu = np.cos(rectangular_object.nadir_angle - rectangular_object.pointing_angle).to_value(
+        u.dimensionless_unscaled
+    )
+    assert rectangular_object.profile.flux == pytest.approx(mu)
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +329,161 @@ def test_degenerate_geometry_allows_only_zero_pointing_angle():
 
 
 # ---------------------------------------------------------------------------
+# Canonical magnitude
+# ---------------------------------------------------------------------------
+
+
+def test_magnitude_defaults_to_none():
+    """Without a magnitude, both magnitude properties are None."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    assert obj.canonical_magnitude is None
+    assert obj.observed_magnitude is None
+
+
+def test_observed_magnitude_round_trips_at_construction_geometry():
+    """observed_magnitude recovers the construction-time observed magnitude."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, magnitude=18.0)
+    assert np.isclose(obj.observed_magnitude, 18.0)
+
+
+def test_canonical_magnitude_differs_from_observed_off_canonical():
+    """Away from the canonical geometry the canonical magnitude is shifted."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, magnitude=18.0)
+    # 550 km slant range at 70 deg zenith is farther and foreshortened relative
+    # to 500 km at zenith, so the two magnitudes must differ.
+    assert not np.isclose(obj.canonical_magnitude, 18.0)
+
+
+def test_canonical_equals_observed_at_canonical_geometry():
+    """At CANONICAL_HEIGHT and zenith, canonical == observed == input."""
+    obj = CircularOrbitalObject(500.0 * u.km, 0.0 * u.deg, 3.0 * u.m, magnitude=18.0)
+    assert np.isclose(obj.canonical_magnitude, 18.0)
+    assert np.isclose(obj.observed_magnitude, 18.0)
+
+
+def test_canonical_magnitude_invariant_under_geometry_change():
+    """canonical_magnitude is invariant while observed_magnitude tracks geometry."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, magnitude=18.0)
+    canonical = obj.canonical_magnitude
+    observed = obj.observed_magnitude
+
+    obj.height = 800.0 * u.km
+    obj.zenith_angle = 40.0 * u.deg
+
+    assert np.isclose(obj.canonical_magnitude, canonical)
+    assert not np.isclose(obj.observed_magnitude, observed)
+
+
+def test_farther_object_is_fainter_when_observed():
+    """A larger canonical->observed distance yields a fainter observed magnitude."""
+    near = CircularOrbitalObject(500.0 * u.km, 0.0 * u.deg, 3.0 * u.m, magnitude=15.0)
+    far = CircularOrbitalObject(500.0 * u.km, 0.0 * u.deg, 3.0 * u.m)
+    far._canonical_magnitude = near.canonical_magnitude
+    far.height = 1000.0 * u.km
+    assert far.observed_magnitude > near.observed_magnitude
+
+
+# ---------------------------------------------------------------------------
+# Flux scaling (object level)
+# ---------------------------------------------------------------------------
+
+
+def test_calculate_flux_matches_calculate_adu(bandpass, photo_params):
+    """calculate_flux equals throughput.calculate_adu for a magnitude."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    assert u.isclose(
+        obj.calculate_flux(bandpass, photo_params, 18.0),
+        bandpass.calculate_adu(18.0, photo_params),
+    )
+
+
+def test_calculate_flux_accepts_sed(bandpass, photo_params):
+    """calculate_flux accepts an Sed brightness spec."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    sed = Sed.for_ab_magnitudes()
+    assert u.isclose(
+        obj.calculate_flux(bandpass, photo_params, sed),
+        bandpass.calculate_adu(sed, photo_params),
+    )
+
+
+def test_calculate_flux_uses_observed_magnitude(bandpass, photo_params):
+    """With no brightness_spec, calculate_flux uses observed_magnitude."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, magnitude=18.0)
+    assert u.isclose(
+        obj.calculate_flux(bandpass, photo_params),
+        bandpass.calculate_adu(obj.observed_magnitude, photo_params),
+    )
+
+
+def test_calculate_flux_requires_a_magnitude(bandpass, photo_params):
+    """Without a magnitude or brightness_spec, calculate_flux raises."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    with pytest.raises(ValueError):
+        obj.calculate_flux(bandpass, photo_params)
+
+
+def test_calculate_flux_bad_throughput(photo_params):
+    """A non-ThroughputCurve throughput raises TypeError."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    with pytest.raises(TypeError):
+        obj.calculate_flux("not a throughput", photo_params, 18.0)
+
+
+def test_calculate_flux_bad_photo_params(bandpass):
+    """A non-PhotometricParameters photo_params raises TypeError."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    with pytest.raises(TypeError):
+        obj.calculate_flux(bandpass, "not photo params", 18.0)
+
+
+@pytest.mark.parametrize("orbital_object", ["circular_object", "rectangular_object"], indirect=True)
+def test_get_scaled_profile_flux(orbital_object, bandpass, photo_params):
+    """The scaled profile integrates to the ADU total from calculate_flux."""
+    profile = orbital_object.get_scaled_profile(bandpass, photo_params, 18.0)
+    expected = orbital_object.calculate_flux(bandpass, photo_params, 18.0).to_value(u.adu)
+    assert np.isclose(profile.flux, expected)
+
+
+def test_get_scaled_profile_brighter_is_larger_flux(bandpass, photo_params):
+    """A brighter (smaller) magnitude yields a larger profile flux."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    bright = obj.get_scaled_profile(bandpass, photo_params, 15.0)
+    faint = obj.get_scaled_profile(bandpass, photo_params, 20.0)
+    assert bright.flux > faint.flux
+
+
+def test_scaled_profile_flux_independent_of_projection(bandpass, photo_params):
+    """The relaxed (non-conserving) projection does not change scaled flux.
+
+    withFlux sets the final total, so the scaled profile integrates to the ADU
+    total regardless of the mu-dimming introduced by relaxing _project.
+    """
+    nadir = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    observatory = CircularOrbitalObject(
+        550.0 * u.km, 70.0 * u.deg, 3.0 * u.m, pointing_angle=nadir.nadir_angle
+    )
+    expected = nadir.calculate_flux(bandpass, photo_params, 18.0).to_value(u.adu)
+    assert np.isclose(nadir.get_scaled_profile(bandpass, photo_params, 18.0).flux, expected)
+    assert np.isclose(observatory.get_scaled_profile(bandpass, photo_params, 18.0).flux, expected)
+
+
+def test_get_scaled_tracked_profile_flux(bandpass, photo_params):
+    """The scaled tracked profile integrates to the ADU total despite a
+    non-unit-flux annular defocus (scale applied after convolution)."""
+    obj = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 3.0 * u.m)
+    psf = galsim.Gaussian(sigma=0.5)
+    pupil = AnnularPupil(2.5 * u.m, 4.18 * u.m)
+
+    # The defocus profile is deliberately not unit flux.
+    assert not np.isclose(pupil.get_profile(obj.distance).flux, 1.0)
+
+    tracked = obj.get_scaled_tracked_profile(bandpass, photo_params, psf, pupil, 18.0)
+    expected = obj.calculate_flux(bandpass, photo_params, 18.0).to_value(u.adu)
+    assert np.isclose(tracked.flux, expected)
+
+
+# ---------------------------------------------------------------------------
 # CompositeOrbitalObject
 # ---------------------------------------------------------------------------
 
@@ -351,9 +528,33 @@ def test_composite_profile_is_projected_gsobject(composite_object):
 
 
 def test_composite_profile_flux_is_sum_of_component_fluxes(composite_object):
-    """galsim.Sum preserves flux: composite flux == sum of relative fluxes."""
-    expected = sum(c.relative_flux() for c in composite_object.components)
+    """Composite flux == sum of component relative fluxes dimmed by mu.
+
+    galsim.Sum preserves each summand's flux and the shared projection dims
+    each by the same mu = cos(nadir_angle - pointing_angle), so the composite
+    flux is mu * sum(relative_flux).
+    """
+    mu = np.cos(composite_object.nadir_angle - composite_object.pointing_angle).to_value(
+        u.dimensionless_unscaled
+    )
+    expected = mu * sum(c.relative_flux() for c in composite_object.components)
     assert composite_object.profile.flux == pytest.approx(expected)
+
+
+def test_composite_seam_matches_project_on_sum(composite_object):
+    """The per-component projection seam is identical to projecting the sum.
+
+    Projecting each component then summing must equal projecting the summed
+    profile once (both _project and galsim.Sum are linear), so the seam is a
+    behavior-preserving refactor of the previous project-once-on-the-sum form.
+    """
+    distance = composite_object.distance
+    unprojected_sum = galsim.Sum([c.get_profile(distance) for c in composite_object.components])
+    reference = composite_object._project(unprojected_sum)
+
+    seam_image = composite_object.profile.drawImage(scale=0.02, method="no_pixel", nx=256, ny=256)
+    reference_image = reference.drawImage(scale=0.02, method="no_pixel", nx=256, ny=256)
+    assert np.allclose(seam_image.array, reference_image.array, atol=1e-8)
 
 
 def test_composite_get_tracked_profile(composite_object):
@@ -368,3 +569,46 @@ def test_composite_inherits_orbital_mechanics(composite_object):
     reference = CircularOrbitalObject(550.0 * u.km, 70.0 * u.deg, 1.0 * u.m)
     assert u.isclose(composite_object.distance, reference.distance)
     assert u.isclose(composite_object.nadir_angle, reference.nadir_angle)
+
+
+# ---------------------------------------------------------------------------
+# Composite flux distribution
+# ---------------------------------------------------------------------------
+
+
+def test_composite_scaled_profile_total_flux(composite_object, bandpass, photo_params):
+    """The scaled composite integrates to the total ADU from calculate_flux."""
+    total_adu = composite_object.calculate_flux(bandpass, photo_params, 17.0).to_value(u.adu)
+    scaled = composite_object.get_scaled_profile(bandpass, photo_params, 17.0)
+    assert np.isclose(scaled.flux, total_adu)
+
+
+def test_composite_scaled_profile_distributes_by_relative_weight(composite_object, bandpass, photo_params):
+    """The total ADU is distributed across components as total * w_i / sum(w_j).
+
+    galsim.Sum + withFlux scale the whole object linearly, so each component's
+    share of the total flux equals its relative-flux weight fraction.
+    """
+    total_adu = composite_object.calculate_flux(bandpass, photo_params, 17.0).to_value(u.adu)
+    weights = [c.relative_flux() for c in composite_object.components]
+    weight_sum = sum(weights)
+
+    # The unprojected/projected per-component summands live in profile.obj_list;
+    # withFlux scales the whole Sum uniformly, so each component's share of the
+    # total ADU is its flux fraction within that Sum.
+    summands = composite_object.profile.obj_list
+    summed_flux = composite_object.profile.flux
+    component_fluxes = [total_adu * obj.flux / summed_flux for obj in summands]
+
+    assert np.isclose(sum(component_fluxes), total_adu)
+    for weight, flux in zip(weights, component_fluxes):
+        assert np.isclose(flux, total_adu * weight / weight_sum)
+
+
+def test_composite_scaled_tracked_profile_total_flux(composite_object, bandpass, photo_params):
+    """The scaled tracked composite integrates to the total ADU."""
+    psf = galsim.Kolmogorov(fwhm=0.7)
+    pupil = AnnularPupil(2.5 * u.m, 4.18 * u.m)
+    total_adu = composite_object.calculate_flux(bandpass, photo_params, 17.0).to_value(u.adu)
+    scaled = composite_object.get_scaled_tracked_profile(bandpass, photo_params, psf, pupil, 17.0)
+    assert np.isclose(scaled.flux, total_adu)

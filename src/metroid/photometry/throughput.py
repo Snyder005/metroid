@@ -3,6 +3,7 @@ import functools
 from typing import Any, Self
 
 import astropy.units as u
+import numpy as np
 from speclite.filters import FilterResponse, load_filter
 
 from .conversions import photon_flux_to_adu
@@ -193,6 +194,54 @@ class ThroughputCurve:
         """
         photon_flux = self.calculate_photon_flux(brightness_spec)
         return photon_flux_to_adu(photon_flux, photo_params)
+
+    @enforce_units
+    def calculate_ab_magnitude_from_adu(
+        self,
+        adu: Adu[Scalar],
+        photo_params: PhotometricParameters,
+    ) -> float:
+        """Calculate the AB magnitude corresponding to a summed ADU.
+
+        This inverts `calculate_adu`. The AB flux is linear in
+        ``10 ** (-0.4 * magnitude)``, so the summed ADU is likewise linear in
+        it and the inverse is ``mag = -2.5 * log10(adu / adu0)``, where
+        ``adu0`` is the summed ADU of a magnitude-zero source under the same
+        photometric parameters.
+
+        Parameters
+        ----------
+        adu : `astropy.units.Quantity`
+            The summed ADU of the observation.
+        photo_params : `metroid.photometry.PhotometricParameters`
+            The photometric parameters of the observation.
+
+        Returns
+        -------
+        magnitude : `float`
+            The AB magnitude of the observation.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``photo_params`` is an invalid type.
+        ValueError
+            Raised if ``adu`` is not strictly positive.
+
+        Notes
+        -----
+        AB magnitudes are treated as unitless `float` values, therefore no
+        unit validation is required for the return value. This mirrors
+        `calculate_ab_magnitude`.
+        """
+        if not isinstance(photo_params, PhotometricParameters):
+            raise TypeError("photo_params must be 'metroid.photometry.PhotometricParameters'")
+
+        if adu <= 0.0 * u.adu:
+            raise ValueError("adu must be strictly positive")
+
+        adu0 = self.calculate_adu(0.0, photo_params)
+        return -2.5 * np.log10((adu / adu0).to_value(u.dimensionless_unscaled))
 
     def calculate_ab_magnitude(self, sed: Sed) -> float:
         """Calculate the AB magnitude of an object given its SED.

@@ -4,7 +4,7 @@
 
 | File | What | When to read |
 | ---- | ---- | ------------ |
-| `observatory.py` | `Observatory` class composing a `Camera`, `Pupil`, and `EarthLocation`; `get_photo_params` method; `from_config` (delegates nested camera/pupil/location blocks) and `from_standard(name)` (bundled catalogue) factories | Implementing or modifying top-level observatory construction; debugging `PhotometricParameters` creation or config-driven / standard-object construction |
+| `observatory.py` | `Observatory` class composing a `Camera`, `Pupil`, and `EarthLocation`; `get_photo_params` method; `get_scaled_profile` (resolves bandpass + photometric params and routes to the object-level flux scaling, tracked when a `psf` is given); `from_config` (delegates nested camera/pupil/location blocks) and `from_standard(name)` (bundled catalogue) factories | Implementing or modifying top-level observatory construction; debugging `PhotometricParameters` creation, magnitude→flux profile scaling, or config-driven / standard-object construction |
 | `camera.py` | `Camera` class holding named `ThroughputCurve` bandpasses, gain, pixel scale, and quantum efficiency; `from_config` factory building bandpasses from speclite filter names, a group wildcard, or inline arrays | Implementing or modifying camera construction; debugging bandpass lookup, iteration, or config-driven bandpass loading |
 | `__init__.py` | Empty package init | Checking what the top-level package exports |
 

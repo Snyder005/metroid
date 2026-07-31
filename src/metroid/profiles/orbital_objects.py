@@ -8,8 +8,12 @@ import numpy as np
 
 from .components import Component
 from .pupils import Pupil
+from ..photometry.photo_params import PhotometricParameters
+from ..photometry.sed import Sed
+from ..photometry.throughput import ThroughputCurve
 from ..utils.decorators import enforce_units
 from ..utils.quantities import (
+    Adu,
     Angle,
     AngularVelocity,
     Area,
@@ -22,6 +26,17 @@ from ..utils.quantities import (
     Velocity,
 )
 
+CANONICAL_HEIGHT: OrbitalDistance[Scalar] = 500.0 * u.km
+"""The canonical reference orbital height for the standardized magnitude.
+
+The canonical geometry is this height observed at zenith (``zenith_angle = 0``),
+where the line-of-sight distance equals the height and the projection factor
+``mu`` is 1. A construction-time observed magnitude is converted to the
+brightness the object would have at this reference geometry and stored, because
+that canonical magnitude is invariant under changes to the (mutable) orbital
+geometry.
+"""
+
 
 class OrbitalObject(ABC):
     """An abstract base class for orbital objects."""
@@ -33,6 +48,7 @@ class OrbitalObject(ABC):
         zenith_angle: Angle[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
+        magnitude: float | None = None,
     ):
         self.height = height
         self.zenith_angle = zenith_angle
@@ -40,6 +56,14 @@ class OrbitalObject(ABC):
         # Assign last: the pointing_angle setter validates against nadir_angle,
         # which is derived from height and zenith_angle.
         self.pointing_angle = pointing_angle
+
+        # Store the geometry-invariant canonical magnitude, not the observed
+        # one: height/zenith_angle/pointing_angle are mutable, so a stored
+        # observed magnitude would go stale when the geometry changes.
+        if magnitude is None:
+            self._canonical_magnitude: float | None = None
+        else:
+            self._canonical_magnitude = self._observed_to_canonical(float(magnitude))
 
     @property
     @enforce_units
@@ -168,6 +192,72 @@ class OrbitalObject(ABC):
         return self.area / self.distance**2
 
     @property
+    def canonical_magnitude(self) -> float | None:
+        """The standardized AB magnitude at the canonical reference geometry
+        (`float` or `None`, read-only).
+
+        The canonical geometry is `CANONICAL_HEIGHT` observed at zenith. This
+        value is invariant under changes to the object's orbital geometry;
+        `None` if no magnitude was supplied at construction.
+        """
+        return self._canonical_magnitude
+
+    @property
+    def observed_magnitude(self) -> float | None:
+        """The AB magnitude at the object's *current* geometry (`float` or
+        `None`, read-only).
+
+        Re-derived from `canonical_magnitude` for the present
+        `height`/`zenith_angle`/`pointing_angle`; `None` if no magnitude was
+        supplied at construction.
+        """
+        if self._canonical_magnitude is None:
+            return None
+        return self._canonical_to_observed(self._canonical_magnitude)
+
+    def _observed_to_canonical(self, magnitude: float) -> float:
+        """Convert an observed AB magnitude to the canonical-geometry magnitude.
+
+        The conversion is a flux ratio and therefore purely geometric (and
+        band-independent): reflected flux scales as ``mu / distance**2``
+        (projection foreshortening times inverse-square range), so
+        ``m_canonical = m_observed + 2.5 * log10(mu) - 5 * log10(d / d_can)``.
+
+        Parameters
+        ----------
+        magnitude : `float`
+            The observed AB magnitude at the current geometry.
+
+        Returns
+        -------
+        canonical_magnitude : `float`
+            The AB magnitude at the canonical reference geometry.
+        """
+        mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
+        distance_ratio = (self.distance / CANONICAL_HEIGHT).to_value(u.dimensionless_unscaled)
+        return magnitude + 2.5 * np.log10(mu) - 5.0 * np.log10(distance_ratio)
+
+    def _canonical_to_observed(self, magnitude: float) -> float:
+        """Convert a canonical-geometry AB magnitude to the observed magnitude.
+
+        The inverse of `_observed_to_canonical` for the current geometry:
+        ``m_observed = m_canonical - 2.5 * log10(mu) + 5 * log10(d / d_can)``.
+
+        Parameters
+        ----------
+        magnitude : `float`
+            The AB magnitude at the canonical reference geometry.
+
+        Returns
+        -------
+        observed_magnitude : `float`
+            The observed AB magnitude at the current geometry.
+        """
+        mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
+        distance_ratio = (self.distance / CANONICAL_HEIGHT).to_value(u.dimensionless_unscaled)
+        return magnitude - 2.5 * np.log10(mu) + 5.0 * np.log10(distance_ratio)
+
+    @property
     @abstractmethod
     def profile(self) -> galsim.GSObject:
         """The surface brightness profile of the object (`galsim.GSObject`,
@@ -240,9 +330,144 @@ class OrbitalObject(ABC):
         tracked_profile = galsim.Convolve(self.profile, defocus, psf)
         return tracked_profile
 
+    @enforce_units
+    def calculate_flux(
+        self,
+        throughput: ThroughputCurve,
+        photo_params: PhotometricParameters,
+        brightness_spec: float | int | Sed | None = None,
+    ) -> Adu[Scalar]:
+        """Calculate the total ADU flux the object's profile should carry.
+
+        The magnitude→ADU bridge: the observatory-facing brightness is an AB
+        magnitude, which is routed through the photometry layer to a total
+        ADU. This is the single place the photometry dependency enters
+        `OrbitalObject`; the scaled-profile methods build on it.
+
+        Parameters
+        ----------
+        throughput : `metroid.photometry.ThroughputCurve`
+            The bandpass through which the object is observed.
+        photo_params : `metroid.photometry.PhotometricParameters`
+            The photometric parameters of the observation.
+        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+            The brightness specification: an AB magnitude or an object SED. If
+            `None` (the default), the object's `observed_magnitude` is used.
+
+        Returns
+        -------
+        adu : `astropy.units.Quantity`
+            The summed ADU of the observation.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``throughput`` or ``photo_params`` is an invalid type.
+        ValueError
+            Raised if ``brightness_spec`` is `None` and the object has no
+            magnitude.
+        """
+        if not isinstance(throughput, ThroughputCurve):
+            raise TypeError("throughput must be 'metroid.photometry.ThroughputCurve'")
+
+        if not isinstance(photo_params, PhotometricParameters):
+            raise TypeError("photo_params must be 'metroid.photometry.PhotometricParameters'")
+
+        if brightness_spec is None:
+            brightness_spec = self.observed_magnitude
+            if brightness_spec is None:
+                raise ValueError("no brightness_spec given and the object has no magnitude")
+
+        return throughput.calculate_adu(brightness_spec, photo_params)
+
+    def get_scaled_profile(
+        self,
+        throughput: ThroughputCurve,
+        photo_params: PhotometricParameters,
+        brightness_spec: float | int | Sed | None = None,
+    ) -> galsim.GSObject:
+        """Get the object's profile scaled to its absolute ADU flux.
+
+        The bare (untracked) profile, for studying an object's surface
+        brightness without a PSF or pupil, rescaled so that it integrates to
+        the total ADU from `calculate_flux`.
+
+        Parameters
+        ----------
+        throughput : `metroid.photometry.ThroughputCurve`
+            The bandpass through which the object is observed.
+        photo_params : `metroid.photometry.PhotometricParameters`
+            The photometric parameters of the observation.
+        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+            The brightness specification (see `calculate_flux`).
+
+        Returns
+        -------
+        profile : `galsim.GSObject`
+            The profile scaled to the absolute ADU flux.
+        """
+        total_adu = self.calculate_flux(throughput, photo_params, brightness_spec)
+        return self.profile.withFlux(total_adu.to_value(u.adu))
+
+    def get_scaled_tracked_profile(
+        self,
+        throughput: ThroughputCurve,
+        photo_params: PhotometricParameters,
+        psf: galsim.GSObject,
+        telescope_pupil: Pupil,
+        brightness_spec: float | int | Sed | None = None,
+    ) -> galsim.GSObject:
+        """Get the tracked profile scaled to its absolute ADU flux.
+
+        The full convolved profile (object, pupil defocus, PSF) rescaled so
+        that it integrates to the total ADU from `calculate_flux`. The flux is
+        applied *after* convolution: the pupil defocus profile is not
+        unit-flux (e.g. an annular pupil carries flux ``1 - (r_i/r_o)**2``) and
+        `galsim.Convolve` multiplies summand fluxes, so `withFlux` on the
+        convolved result normalizes to unit flux and rescales to exactly the
+        target ADU regardless of intermediate flux bookkeeping.
+
+        Parameters
+        ----------
+        throughput : `metroid.photometry.ThroughputCurve`
+            The bandpass through which the object is observed.
+        photo_params : `metroid.photometry.PhotometricParameters`
+            The photometric parameters of the observation.
+        psf : `galsim.GSObject`
+            The surface brightness profile of a point-spread function.
+        telescope_pupil : `metroid.Pupil`
+            The pupil of the observing telescope.
+        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+            The brightness specification (see `calculate_flux`).
+
+        Returns
+        -------
+        tracked_profile : `galsim.GSObject`
+            The tracked profile scaled to the absolute ADU flux.
+
+        Raises
+        ------
+        TypeError
+            Raised if ``psf`` or ``telescope_pupil`` is an invalid type.
+        """
+        total_adu = self.calculate_flux(throughput, photo_params, brightness_spec)
+        tracked_profile = self.get_tracked_profile(psf, telescope_pupil)
+        return tracked_profile.withFlux(total_adu.to_value(u.adu))
+
     def _project(self, profile: galsim.GSObject) -> galsim.Transformation:
         """Apply angle-of-view projection effects to a surface brightness
         profile.
+
+        The foreshortening is not flux-conserving: ``transform(mu, 0, 0, 1)``
+        scales total flux by the Jacobian ``mu = cos(nadir_angle -
+        pointing_angle)``, and that scaling is deliberately kept (there is no
+        compensating ``/ mu``). A diffuse (Lambertian) surface seen off-normal
+        reflects less total light toward the observer in proportion to its
+        projected area, so total flux dims by ``mu``. For an absolutely-scaled
+        profile this is invisible because `get_scaled_profile` /
+        `get_scaled_tracked_profile` set the final total with `withFlux`; it
+        matters for the bare `profile` flux and for future per-component
+        projected-area weighting.
 
         Parameters
         ----------
@@ -257,7 +482,7 @@ class OrbitalObject(ABC):
         mu = np.cos(self.nadir_angle - self.pointing_angle)
         phi = galsim.Angle(self.rotation_angle.to_value(u.deg), unit=galsim.degrees)
 
-        return profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi) / mu
+        return profile.rotate(phi).transform(mu, 0.0, 0.0, 1.0).rotate(-phi)
 
 
 class CircularOrbitalObject(OrbitalObject):
@@ -271,8 +496,9 @@ class CircularOrbitalObject(OrbitalObject):
         radius: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
+        magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
         self._radius = radius
 
     @property
@@ -314,8 +540,9 @@ class RectangularOrbitalObject(OrbitalObject):
         length: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
+        magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
         self._width = width
         self._length = length
 
@@ -359,8 +586,8 @@ class CompositeOrbitalObject(OrbitalObject):
     """An orbital object assembled from multiple `Component` parts.
 
     A composite shares a single orbit for the whole rigid body; each component
-    contributes an unprojected body-frame profile, and the summed profile is
-    projected once along the line of sight.
+    contributes an unprojected body-frame profile, which is projected along the
+    shared line of sight and then summed.
     """
 
     @enforce_units
@@ -371,8 +598,9 @@ class CompositeOrbitalObject(OrbitalObject):
         components: Sequence[Component],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
+        magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
 
         components = tuple(components)
         if not components:
@@ -392,17 +620,29 @@ class CompositeOrbitalObject(OrbitalObject):
         return self._components
 
     @property
-    def profile(self) -> galsim.Transformation:
+    def profile(self) -> galsim.Sum:
         """The surface brightness profile of the object, foreshortened by the
-        pointing-angle projection (`galsim.Transformation`, read-only).
+        pointing-angle projection (`galsim.Sum`, read-only).
 
-        Each component profile is built at the composite's `distance`, summed
-        with `galsim.Sum`, then projected once (never per component).
+        Each component profile is built at the composite's `distance`,
+        projected, and then summed with `galsim.Sum`. Projecting each component
+        before summing is a *seam* for future work: with a single shared
+        projection angle it is provably identical to projecting the summed
+        profile once (both `_project` and `galsim.Sum` are linear about the
+        body-frame origin), so it changes nothing today.
+
+        Revisit this seam -- promoting the shared ``self._project(...)`` to a
+        per-component projection that computes each component's own ``mu`` from
+        its own body-frame normal and the shared viewing geometry -- when any
+        of the following becomes true: (1) components gain independent
+        orientation/pointing (their own normals), (2) a 3-D body is projected
+        to a 2-D observed profile, or (3) per-component projected-area flux
+        weighting is required (e.g. a deployed solar panel seen edge-on). Until
+        then the shared angle keeps behavior identical to projecting the sum.
         """
-        profiles = [component.get_profile(self.distance) for component in self.components]
-        summed = galsim.Sum(profiles)
+        profiles = [self._project(component.get_profile(self.distance)) for component in self.components]
 
-        return self._project(summed)
+        return galsim.Sum(profiles)
 
     @property
     @enforce_units
