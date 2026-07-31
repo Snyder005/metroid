@@ -46,6 +46,19 @@ telescope). The physically meaningful range is `[0, nadir_angle]`, and
 `nadir_angle` itself depends on the object's `zenith_angle` and `height`.
 The setter validates this range and raises `ValueError` outside it.
 
+**Composite objects and components.** `CompositeOrbitalObject` models a
+real satellite as an assembly of parts. Each part is a `Component`
+(`CircularComponent` → `galsim.TopHat`, `RectangularComponent` →
+`galsim.Box`) described in the satellite's own *body frame*: a shape, a
+local centroid offset `(x0, y0)` in meters, and a `reflectivity`. A
+`Component` deliberately holds **no** orbital state — distance, velocity,
+and projection all belong to the enclosing `CompositeOrbitalObject`,
+which shares one orbit for the whole rigid body. This mirrors how `Pupil`
+is orbit-agnostic and receives `distance` at `get_profile` time. The
+composite's `profile` builds each component profile at the shared
+`distance`, sums them with `galsim.Sum`, and projects the sum once; its
+`area` is the sum of component areas.
+
 ## Design Decisions
 
 `orbital_velocity` assumes a circular orbit at `height`:
@@ -61,6 +74,22 @@ so the single continuous expression strictly generalizes the two former
 branches. Historically orientation was a boolean `nadir_pointing` with
 `_project` skipped entirely for observatory pointing; the continuous
 angle subsumes both former states.
+
+**Reflectivity sets relative surface brightness.** Under a fully diffuse
+(Lambertian) assumption a component's reflected surface brightness
+(radiance) is proportional to its `reflectivity`, and its total reflected
+signal is proportional to `reflectivity * area`. That product is used as
+each component's galsim flux (`Component.relative_flux`), so `galsim.Sum`
+yields physically correct *relative* brightness between parts (a large
+dim panel vs. a small bright bus). This is a *relative* model only;
+absolute photometric normalization (magnitude → ADU) is intentionally
+deferred to the flux-scaling roadmap (issue #35). The reflectivity → flux
+computation is isolated in `relative_flux` so #35 can extend it.
+
+`CompositeOrbitalObject.area` is the simple sum of component areas.
+Overlap between parts is ignored (second order under the flat-diffuse
+assumption), which keeps `solid_angle = area / distance^2` well defined
+at the cost of slight over-counting when parts physically overlap.
 
 ## Invariants
 
@@ -82,3 +111,10 @@ directly overhead, `nadir_angle` collapses to `0`, and the only valid
 `width` and `length` are only validated lazily when their property
 getters run — a bad-unit value can be stored and raise later
 (tracked in issue #13).
+
+**Project once, on the sum.** The line-of-sight foreshortening
+(`_project`) must be applied exactly once, to the summed composite
+profile, never per component. Components return unprojected body-frame
+profiles (`Component.get_profile` has no orbital state and cannot
+project); only `CompositeOrbitalObject.profile` projects. Violating this
+double-projects and corrupts the geometry.

@@ -372,6 +372,9 @@ PIXEL_SCALE = Spec("pixel_scale", u.arcsec / u.pix).build()
 FRACTION = Spec("fraction", u.dimensionless_unscaled).build()
 """The throughput specification."""
 
+REFLECTIVITY = Spec("reflectivity", u.dimensionless_unscaled).ranged(0.0, 1.0).build()
+"""The reflectivity specification (dimensionless fraction in [0, 1])."""
+
 SPECTRAL_FLUX_DENSITY = Spec("spectral_flux_density", u.erg / (u.s * u.cm**2 * u.AA)).build()
 """The wavelength spectral flux density specification."""
 
@@ -406,6 +409,7 @@ type Gain[Sh] = Annotated[u.Quantity, GAIN, Sh]
 type QuantumEfficiency[Sh] = Annotated[u.Quantity, QUANTUM_EFFICIENCY, Sh]
 type PixelScale[Sh] = Annotated[u.Quantity, PIXEL_SCALE, Sh]
 type Fraction[Sh] = Annotated[u.Quantity, FRACTION, Sh]
+type Reflectivity[Sh] = Annotated[u.Quantity, REFLECTIVITY, Sh]
 type SpectralFluxDensity[Sh] = Annotated[u.Quantity, SPECTRAL_FLUX_DENSITY, Sh]
 type PhotonFlux[Sh] = Annotated[u.Quantity, PHOTON_FLUX, Sh]
 type EnergyFlux[Sh] = Annotated[u.Quantity, ENERGY_FLUX, Sh]

@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from astropy.constants import G, R_earth, M_earth
 import astropy.units as u
 import galsim
 import numpy as np
 
+from .components import Component
 from .pupils import Pupil
 from ..utils.decorators import enforce_units
 from ..utils.quantities import (
@@ -351,3 +353,61 @@ class RectangularOrbitalObject(OrbitalObject):
         (`astropy.units.Quantity`, read-only).
         """
         return self.width * self.length
+
+
+class CompositeOrbitalObject(OrbitalObject):
+    """An orbital object assembled from multiple `Component` parts.
+
+    A composite shares a single orbit for the whole rigid body; each component
+    contributes an unprojected body-frame profile, and the summed profile is
+    projected once along the line of sight.
+    """
+
+    @enforce_units
+    def __init__(
+        self,
+        height: OrbitalDistance[Scalar],
+        zenith_angle: Angle[Scalar],
+        components: Sequence[Component],
+        rotation_angle: Angle[Scalar] = 0.0 * u.deg,
+        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
+    ):
+        super().__init__(height, zenith_angle, rotation_angle, pointing_angle)
+
+        components = tuple(components)
+        if not components:
+            raise ValueError("components must be non-empty")
+
+        for component in components:
+            if not isinstance(component, Component):
+                raise TypeError("must be 'metroid.profiles.Component'")
+
+        self._components = components
+
+    @property
+    def components(self) -> tuple[Component, ...]:
+        """The parts making up the composite object
+        (`tuple` [`metroid.profiles.Component`, ...], read-only).
+        """
+        return self._components
+
+    @property
+    def profile(self) -> galsim.Transformation:
+        """The surface brightness profile of the object, foreshortened by the
+        pointing-angle projection (`galsim.Transformation`, read-only).
+
+        Each component profile is built at the composite's `distance`, summed
+        with `galsim.Sum`, then projected once (never per component).
+        """
+        profiles = [component.get_profile(self.distance) for component in self.components]
+        summed = galsim.Sum(profiles)
+
+        return self._project(summed)
+
+    @property
+    @enforce_units
+    def area(self) -> Area[Scalar]:
+        """The surface area of the object, the sum of its component areas, in
+        square meters (`astropy.units.Quantity`, read-only).
+        """
+        return sum((component.area for component in self.components), 0.0 * u.m**2)
