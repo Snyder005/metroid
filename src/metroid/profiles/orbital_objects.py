@@ -48,7 +48,9 @@ class OrbitalObject(ABC):
         zenith_angle: Angle[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
-        magnitude: float | None = None,
+        *,
+        observed_magnitude: float | None = None,
+        canonical_magnitude: float | None = None,
     ):
         self.height = height
         self.zenith_angle = zenith_angle
@@ -57,13 +59,26 @@ class OrbitalObject(ABC):
         # which is derived from height and zenith_angle.
         self.pointing_angle = pointing_angle
 
+        # A magnitude is required, given as exactly one of the two measurables
+        # an observatory reports: the observed magnitude at this object's
+        # construction geometry, or a standardized "average"/canonical
+        # magnitude. Accepting both would let a caller supply a pair that
+        # violates their fixed geometric relationship, so exactly one is
+        # allowed.
+        if (observed_magnitude is None) == (canonical_magnitude is None):
+            raise ValueError(
+                "exactly one of observed_magnitude or canonical_magnitude is required (not both)"
+            )
+
         # Store the geometry-invariant canonical magnitude, not the observed
         # one: height/zenith_angle/pointing_angle are mutable, so a stored
-        # observed magnitude would go stale when the geometry changes.
-        if magnitude is None:
-            self._canonical_magnitude: float | None = None
+        # observed magnitude would go stale when the geometry changes. An
+        # observed input is converted to canonical at the construction geometry.
+        if canonical_magnitude is not None:
+            self._canonical_magnitude: float = float(canonical_magnitude)
         else:
-            self._canonical_magnitude = self._observed_to_canonical(float(magnitude))
+            assert observed_magnitude is not None  # guaranteed by the check above
+            self._canonical_magnitude = self._observed_to_canonical(float(observed_magnitude))
 
     @property
     @enforce_units
@@ -192,27 +207,23 @@ class OrbitalObject(ABC):
         return self.area / self.distance**2
 
     @property
-    def canonical_magnitude(self) -> float | None:
+    def canonical_magnitude(self) -> float:
         """The standardized AB magnitude at the canonical reference geometry
-        (`float` or `None`, read-only).
+        (`float`, read-only).
 
         The canonical geometry is `CANONICAL_HEIGHT` observed at zenith. This
-        value is invariant under changes to the object's orbital geometry;
-        `None` if no magnitude was supplied at construction.
+        value is invariant under changes to the object's orbital geometry.
         """
         return self._canonical_magnitude
 
     @property
-    def observed_magnitude(self) -> float | None:
-        """The AB magnitude at the object's *current* geometry (`float` or
-        `None`, read-only).
+    def observed_magnitude(self) -> float:
+        """The AB magnitude at the object's *current* geometry (`float`,
+        read-only).
 
         Re-derived from `canonical_magnitude` for the present
-        `height`/`zenith_angle`/`pointing_angle`; `None` if no magnitude was
-        supplied at construction.
+        `height`/`zenith_angle`/`pointing_angle`.
         """
-        if self._canonical_magnitude is None:
-            return None
         return self._canonical_to_observed(self._canonical_magnitude)
 
     def _observed_to_canonical(self, magnitude: float) -> float:
@@ -363,9 +374,6 @@ class OrbitalObject(ABC):
         ------
         TypeError
             Raised if ``throughput`` or ``photo_params`` is an invalid type.
-        ValueError
-            Raised if ``brightness_spec`` is `None` and the object has no
-            magnitude.
         """
         if not isinstance(throughput, ThroughputCurve):
             raise TypeError("throughput must be 'metroid.photometry.ThroughputCurve'")
@@ -375,8 +383,6 @@ class OrbitalObject(ABC):
 
         if brightness_spec is None:
             brightness_spec = self.observed_magnitude
-            if brightness_spec is None:
-                raise ValueError("no brightness_spec given and the object has no magnitude")
 
         return throughput.calculate_adu(brightness_spec, photo_params)
 
@@ -496,9 +502,18 @@ class CircularOrbitalObject(OrbitalObject):
         radius: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
-        magnitude: float | None = None,
+        *,
+        observed_magnitude: float | None = None,
+        canonical_magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
+        super().__init__(
+            height,
+            zenith_angle,
+            rotation_angle,
+            pointing_angle,
+            observed_magnitude=observed_magnitude,
+            canonical_magnitude=canonical_magnitude,
+        )
         self._radius = radius
 
     @property
@@ -540,9 +555,18 @@ class RectangularOrbitalObject(OrbitalObject):
         length: GeometryLength[Scalar],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
-        magnitude: float | None = None,
+        *,
+        observed_magnitude: float | None = None,
+        canonical_magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
+        super().__init__(
+            height,
+            zenith_angle,
+            rotation_angle,
+            pointing_angle,
+            observed_magnitude=observed_magnitude,
+            canonical_magnitude=canonical_magnitude,
+        )
         self._width = width
         self._length = length
 
@@ -598,9 +622,18 @@ class CompositeOrbitalObject(OrbitalObject):
         components: Sequence[Component],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
-        magnitude: float | None = None,
+        *,
+        observed_magnitude: float | None = None,
+        canonical_magnitude: float | None = None,
     ):
-        super().__init__(height, zenith_angle, rotation_angle, pointing_angle, magnitude)
+        super().__init__(
+            height,
+            zenith_angle,
+            rotation_angle,
+            pointing_angle,
+            observed_magnitude=observed_magnitude,
+            canonical_magnitude=canonical_magnitude,
+        )
 
         components = tuple(components)
         if not components:

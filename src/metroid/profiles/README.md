@@ -90,18 +90,46 @@ yields physically correct *relative* brightness between parts (a large
 dim panel vs. a small bright bus). This is a *relative* model; the
 absolute scale comes from **Flux scaling** below.
 
-**Flux scaling — brightness input is always a magnitude.** Observatories
-report magnitudes, so an object's absolute brightness is set by an
-observed AB magnitude (or an `Sed`), never a raw flux. The construction
-magnitude is the *observed* magnitude at the object's current geometry; it
-is converted at construction to the geometry-invariant **canonical
-magnitude** (the brightness at `CANONICAL_HEIGHT` = 500 km observed at
-zenith) and stored, because `height`/`zenith_angle`/`pointing_angle` are
-mutable and a stored observed magnitude would go stale. The conversion is
-purely geometric (a flux ratio, band-independent):
+**Flux scaling — a brightness magnitude is required.** Observatories
+report magnitudes, so an object's absolute brightness is set by an AB
+magnitude (or an `Sed`), never a raw flux. A magnitude is **required** at
+construction, supplied as exactly one of two mutually exclusive keyword
+arguments — never both, so a caller cannot supply a pair that violates
+their fixed geometric relationship:
+
+- `observed_magnitude` — the magnitude of a specific satellite measured for
+  a specific observation, i.e. at the geometry given by the other
+  construction parameters.
+- `canonical_magnitude` — a standardized "average" magnitude at the
+  canonical reference geometry (`CANONICAL_HEIGHT` = 500 km observed at
+  zenith). There is no astronomical standard for this reference yet, so the
+  height lives in a single module-level global.
+
+Either way the geometry-invariant **canonical** magnitude is what gets
+stored (an `observed_magnitude` is converted to canonical at the
+construction geometry first), because `height`/`zenith_angle`/`pointing_angle`
+are mutable and a stored observed magnitude would go stale. The conversion
+is purely geometric (a flux ratio, band-independent):
 `m_can = m_obs + 2.5*log10(mu) - 5*log10(distance / d_can)`, with
 `flux ∝ mu / distance^2`. `canonical_magnitude` and `observed_magnitude`
 (re-derived for the current geometry) are read-only properties.
+
+**Projection lives only in the standardization, not in the collected
+flux.** Current studies identify a specific satellite and measure its
+magnitude *while tracking* it. That measurement is made knowing only the
+zenith angle and height: the observatory does not know the satellite's
+pointing/orientation and assumes all reflected flux is collected regardless
+of how the projection spread it across the profile. So the
+`observed_magnitude → total ADU` path (`calculate_flux`) is **independent of
+projection** — `mu` does not appear in it. Projection (`mu`) enters *only*
+the `canonical ↔ observed` conversion above. This is deliberate and
+essential: standardizing an observed magnitude to a common geometry is
+exactly the correction this software exists to compute, since the
+"average/canonical" magnitudes reporting observatories publish do not
+account for projection (nor, separately, for an angle-dependent BRDF — a
+future correction). Within this corrected framework we place satellites
+with as much known geometry/orientation/BRDF information as possible to
+predict what future observatories will measure.
 
 At render time the observed magnitude routes through the photometry layer
 (`ThroughputCurve.calculate_adu`) to a total **ADU**, which becomes the

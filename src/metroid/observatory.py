@@ -164,23 +164,33 @@ class Observatory:
         return photo_params
 
     @enforce_units
-    def get_scaled_profile(
+    def track_satellite(
         self,
         orbital_object: OrbitalObject,
         band: str,
         exptime: Time[Scalar],
+        psf: galsim.GSObject,
         brightness_spec: float | int | Sed | None = None,
-        psf: galsim.GSObject | None = None,
     ) -> galsim.GSObject:
-        """Get an orbital object's profile scaled to its absolute ADU flux.
+        """Get the satellite as it appears in a tracked image.
 
-        A convenience wrapper that resolves the observation's bandpass and
+        Returns the object's scaled, tracked surface-brightness profile: what
+        the satellite looks like in an image where the telescope tracks it,
+        under this observatory's bandpass, pupil, and the supplied exposure and
+        PSF. A ``psf`` is required because a real observatory always focuses at
+        infinity through an intervening atmosphere and therefore never sees the
+        bare, unconvolved profile; the unconvolved profile is a lab
+        observation, available directly from `OrbitalObject.get_scaled_profile`.
+
+        A convenience wrapper: it resolves the observation's bandpass and
         photometric parameters from this observatory and delegates the flux
-        scaling to the object itself. When a ``psf`` is supplied the tracked
-        (convolved) profile is returned, using this observatory's pupil;
-        otherwise the bare profile is returned. The identical scaling can be
-        obtained directly from the `OrbitalObject` methods, which is useful for
-        studying a profile without constructing an `Observatory`.
+        scaling to the object itself. The identical result can be obtained
+        directly from `OrbitalObject.get_scaled_tracked_profile`, which is
+        useful for studying a profile without constructing an `Observatory`.
+
+        The complementary observation -- a satellite passing through an image
+        and leaving a trail rather than being tracked -- is future work and
+        would be exposed as ``observe_satellite``.
 
         Parameters
         ----------
@@ -190,34 +200,30 @@ class Observatory:
             The camera bandpass name.
         exptime : `astropy.units.Quantity`
             The exposure time.
+        psf : `galsim.GSObject`
+            The point-spread function to convolve with.
         brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
             The brightness specification: an AB magnitude or an object SED. If
             `None` (the default), the object's ``observed_magnitude`` is used.
-        psf : `galsim.GSObject` or `None`
-            A point-spread function. If given, the tracked profile is returned;
-            otherwise the bare profile is returned.
 
         Returns
         -------
         profile : `galsim.GSObject`
-            The scaled (and, if ``psf`` is given, tracked) profile.
+            The scaled, tracked profile.
 
         Raises
         ------
         TypeError
-            Raised if ``orbital_object`` is not an `OrbitalObject`.
+            Raised if ``orbital_object`` is not an `OrbitalObject`, or if
+            ``psf`` is not a `galsim.GSObject`.
         ValueError
-            Raised if ``band`` is not a known bandpass, or if
-            ``brightness_spec`` is `None` and the object has no magnitude.
+            Raised if ``band`` is not a known bandpass.
         """
         if not isinstance(orbital_object, OrbitalObject):
             raise TypeError("orbital_object must be 'metroid.profiles.OrbitalObject'")
 
         throughput = self.camera[band]
         photo_params = self.get_photo_params(exptime)
-
-        if psf is None:
-            return orbital_object.get_scaled_profile(throughput, photo_params, brightness_spec)
 
         return orbital_object.get_scaled_tracked_profile(
             throughput, photo_params, psf, self.pupil, brightness_spec
