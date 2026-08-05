@@ -26,15 +26,14 @@ from ..utils.quantities import (
     Velocity,
 )
 
-CANONICAL_HEIGHT: OrbitalDistance[Scalar] = 500.0 * u.km
-"""The canonical reference orbital height for the standardized magnitude.
+CANONICAL_RANGE: OrbitalDistance[Scalar] = 500.0 * u.km
+"""The canonical reference orbital range for the standardized magnitude.
 
-The canonical geometry is this height observed at zenith (``zenith_angle = 0``),
-where the line-of-sight distance equals the height and the projection factor
-``mu`` is 1. A construction-time observed magnitude is converted to the
-brightness the object would have at this reference geometry and stored, because
-that canonical magnitude is invariant under changes to the (mutable) orbital
-geometry.
+The canonical geometry is observed face-on (``projection_angle = 0``) where
+the line-of-sight distance equals the range and the projection factor ``mu``
+is 1. A construction-time observed magnitude is converted to the brightness
+the object would have at this reference geometry and stored, because this is
+invariant under changes to the (mutable) orbital geometry.
 """
 
 
@@ -209,7 +208,7 @@ class OrbitalObject(ABC):
         """The standardized AB magnitude at the canonical reference geometry
         (`float`, read-only).
 
-        The canonical geometry is `CANONICAL_HEIGHT` observed at zenith. This
+        The canonical geometry is `CANONICAL_RANGE` observed face-on. This
         value is invariant under changes to the object's orbital geometry.
         """
         return self._canonical_magnitude
@@ -243,7 +242,7 @@ class OrbitalObject(ABC):
             The AB magnitude at the canonical reference geometry.
         """
         mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
-        distance_ratio = (self.distance / CANONICAL_HEIGHT).to_value(u.dimensionless_unscaled)
+        distance_ratio = (self.distance / CANONICAL_RANGE).to_value(u.dimensionless_unscaled)
         return magnitude + 2.5 * np.log10(mu) - 5.0 * np.log10(distance_ratio)
 
     def _canonical_to_observed(self, magnitude: float) -> float:
@@ -263,7 +262,7 @@ class OrbitalObject(ABC):
             The observed AB magnitude at the current geometry.
         """
         mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
-        distance_ratio = (self.distance / CANONICAL_HEIGHT).to_value(u.dimensionless_unscaled)
+        distance_ratio = (self.distance / CANONICAL_RANGE).to_value(u.dimensionless_unscaled)
         return magnitude - 2.5 * np.log10(mu) + 5.0 * np.log10(distance_ratio)
 
     @property
