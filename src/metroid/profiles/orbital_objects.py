@@ -59,6 +59,7 @@ class OrbitalObject(ABC):
         # which is derived from height and zenith_angle.
         self.pointing_angle = pointing_angle
 
+        ## Modify below, only require observed magnitude, no canonical
         # A magnitude is required, given as exactly one of the two measurables
         # an observatory reports: the observed magnitude at this object's
         # construction geometry, or a standardized "average"/canonical
@@ -70,6 +71,7 @@ class OrbitalObject(ABC):
                 "exactly one of observed_magnitude or canonical_magnitude is required (not both)"
             )
 
+        ## This likely gets modified, to preserve the unscaled output flux
         # Store the geometry-invariant canonical magnitude, not the observed
         # one: height/zenith_angle/pointing_angle are mutable, so a stored
         # observed magnitude would go stale when the geometry changes. An
@@ -125,10 +127,6 @@ class OrbitalObject(ABC):
         """The pointing angle of the object, measured from its nadir direction
         toward the telescope line of sight, in degrees
         (`astropy.units.Quantity`).
-
-        The physically meaningful range is ``[0, nadir_angle]``:
-        ``0 deg`` (the default) is nadir-pointing and ``nadir_angle`` is
-        observatory-pointing (face-on to the telescope).
         """
         return self._pointing_angle
 
@@ -136,9 +134,9 @@ class OrbitalObject(ABC):
     @enforce_units
     def pointing_angle(self, quantity: Angle[Scalar]) -> None:
         nadir_angle = self.nadir_angle
-        if not (0.0 * u.deg <= quantity <= nadir_angle):
+        if not (nadir_angle - 90 * u.deg) < quantity < (nadir_angle + 90 * u.deg):
             raise ValueError(
-                f"pointing_angle must be within [0 deg, {nadir_angle.to(u.deg)}], got {quantity.to(u.deg)}"
+                f"pointing_angle must be within {nadir_angle.to(u.deg)} +/- 90 deg, got {quantity.to(u.deg)}"
             )
 
         self._pointing_angle = quantity
