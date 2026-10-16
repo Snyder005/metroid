@@ -106,11 +106,11 @@ def test_pointing_angle_setter_updates_value(circular_object):
 
 
 def test_pointing_angle_setter_rejects_out_of_range(circular_object):
-    """The pointing_angle setter rejects values outside [0, nadir_angle]."""
+    """The pointing_angle setter rejects values outside nadir_angle +/- 90."""
     with pytest.raises(ValueError):
-        circular_object.pointing_angle = -1.0 * u.deg
+        circular_object.pointing_angle = circular_object.nadir_angle - 91.0 * u.deg
     with pytest.raises(ValueError):
-        circular_object.pointing_angle = circular_object.nadir_angle + 5.0 * u.deg
+        circular_object.pointing_angle = circular_object.nadir_angle + 91.0 * u.deg
 
 
 def test_pointing_angle_setter_rejects_bad_unit(circular_object):
@@ -329,7 +329,7 @@ def test_degenerate_geometry_allows_only_zero_pointing_angle():
     assert u.isclose(obj.nadir_angle, 0.0 * u.deg, atol=1e-12 * u.deg)
     assert obj.pointing_angle == 0.0 * u.deg
     with pytest.raises(ValueError):
-        obj.pointing_angle = 1.0 * u.deg
+        obj.pointing_angle = obj.nadir_angle - 91.0 * u.deg
 
 
 # ---------------------------------------------------------------------------
