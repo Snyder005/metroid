@@ -44,42 +44,10 @@ class OrbitalObject(ABC):
     def __init__(
         self,
         height: OrbitalDistance[Scalar],
-        zenith_angle: Angle[Scalar],
-        rotation_angle: Angle[Scalar] = 0.0 * u.deg,
-        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
-        *,
-        observed_magnitude: float | None = None,
-        canonical_magnitude: float | None = None,
+        orientation: Rotation = Rotation.identity()
     ):
         self.height = height
-        self.zenith_angle = zenith_angle
-        self.rotation_angle = rotation_angle
-        # Assign last: the pointing_angle setter validates against nadir_angle,
-        # which is derived from height and zenith_angle.
-        self.pointing_angle = pointing_angle
-
-        ## Modify below, only require observed magnitude, no canonical
-        # A magnitude is required, given as exactly one of the two measurables
-        # an observatory reports: the observed magnitude at this object's
-        # construction geometry, or a standardized "average"/canonical
-        # magnitude. Accepting both would let a caller supply a pair that
-        # violates their fixed geometric relationship, so exactly one is
-        # allowed.
-        if (observed_magnitude is None) == (canonical_magnitude is None):
-            raise ValueError(
-                "exactly one of observed_magnitude or canonical_magnitude is required (not both)"
-            )
-
-        ## This likely gets modified, to preserve the unscaled output flux
-        # Store the geometry-invariant canonical magnitude, not the observed
-        # one: height/zenith_angle/pointing_angle are mutable, so a stored
-        # observed magnitude would go stale when the geometry changes. An
-        # observed input is converted to canonical at the construction geometry.
-        if canonical_magnitude is not None:
-            self._canonical_magnitude: float = float(canonical_magnitude)
-        else:
-            assert observed_magnitude is not None  # guaranteed by the check above
-            self._canonical_magnitude = self._observed_to_canonical(float(observed_magnitude))
+        self.orientation = orientation
 
     @property
     @enforce_units
@@ -106,39 +74,6 @@ class OrbitalObject(ABC):
     @enforce_units
     def zenith_angle(self, quantity: Angle[Scalar]) -> None:
         self._zenith_angle = quantity
-
-    @property
-    @enforce_units
-    def rotation_angle(self) -> Angle[Scalar]:
-        """The rotation angle of the object from the horizon, in degrees
-        (`astropy.units.Quantity`).
-        """
-        return self._rotation_angle
-
-    @rotation_angle.setter
-    @enforce_units
-    def rotation_angle(self, quantity: Angle[Scalar]) -> None:
-        self._rotation_angle = quantity
-
-    @property
-    @enforce_units
-    def pointing_angle(self) -> Angle[Scalar]:
-        """The pointing angle of the object, measured from its nadir direction
-        toward the telescope line of sight, in degrees
-        (`astropy.units.Quantity`).
-        """
-        return self._pointing_angle
-
-    @pointing_angle.setter
-    @enforce_units
-    def pointing_angle(self, quantity: Angle[Scalar]) -> None:
-        nadir_angle = self.nadir_angle
-        if not (nadir_angle - 90 * u.deg) < quantity < (nadir_angle + 90 * u.deg):
-            raise ValueError(
-                f"pointing_angle must be within {nadir_angle.to(u.deg)} +/- 90 deg, got {quantity.to(u.deg)}"
-            )
-
-        self._pointing_angle = quantity
 
     @property
     @enforce_units
@@ -183,7 +118,7 @@ class OrbitalObject(ABC):
         """
         v = self.orbital_velocity
         theta = self.nadir_angle
-        phi = self.rotation_angle
+        phi = self.rotation_angle # from orientation Rotation in x
         return v * np.sqrt(1 - np.sin(theta) ** 2 * np.cos(phi) ** 2)
 
     @property

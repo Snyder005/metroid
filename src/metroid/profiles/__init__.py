@@ -1,21 +1,3 @@
-from .components import CircularComponent, Component, RectangularComponent
+from .surfaces import CircularSurface, RectangularSurface, Surface
 from .pupils import AnnularPupil, CircularPupil, Pupil
-from .orbital_objects import (
-    CircularOrbitalObject,
-    CompositeOrbitalObject,
-    OrbitalObject,
-    RectangularOrbitalObject,
-)
-
-__all__ = [
-    "AnnularPupil",
-    "CircularComponent",
-    "CircularOrbitalObject",
-    "CircularPupil",
-    "Component",
-    "CompositeOrbitalObject",
-    "OrbitalObject",
-    "Pupil",
-    "RectangularComponent",
-    "RectangularOrbitalObject",
-]
+from .orbital_objects import OrbitalObject
