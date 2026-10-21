@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from astropy.constants import G, R_earth, M_earth
 import astropy.units as u
 import galsim
 import numpy as np
 
-from .components import Component
+from .surfaces import Surface
 from .pupils import Pupil
 from ..photometry.photo_params import PhotometricParameters
 from ..photometry.sed import Sed
@@ -44,10 +45,16 @@ class OrbitalObject(ABC):
     def __init__(
         self,
         height: OrbitalDistance[Scalar],
-        orientation: Rotation = Rotation.identity()
+        zenith_angle: Angle[Scalar],
+        rotation_angle: Angle[Scalar] = 0.0 * u.deg,
+        pointing_angle: Angle[Scalar] = 0.0 * u.deg,
     ):
         self.height = height
         self.orientation = orientation
+        self.rotation_angle = rotation_angle
+        # Assign last: the pointing_angle setter validates against nadir_angle,
+        # which is derived from height and zenith_angle.
+        self.pointing_angle = pointing_angle
 
     @property
     @enforce_units
@@ -74,6 +81,39 @@ class OrbitalObject(ABC):
     @enforce_units
     def zenith_angle(self, quantity: Angle[Scalar]) -> None:
         self._zenith_angle = quantity
+
+    @property
+    @enforce_units
+    def rotation_angle(self) -> Angle[Scalar]:
+        """The rotation angle of the object from the horizon, in degrees
+        (`astropy.units.Quantity`).
+        """
+        return self._rotation_angle
+
+    @rotation_angle.setter
+    @enforce_units
+    def rotation_angle(self, quantity: Angle[Scalar]) -> None:
+        self._rotation_angle = quantity
+
+    @property
+    @enforce_units
+    def pointing_angle(self) -> Angle[Scalar]:
+        """The pointing angle of the object, measured from its nadir direction
+        toward the telescope line of sight, in degrees
+        (`astropy.units.Quantity`).
+        """
+        return self._pointing_angle
+
+    @pointing_angle.setter
+    @enforce_units
+    def pointing_angle(self, quantity: Angle[Scalar]) -> None:
+        nadir_angle = self.nadir_angle
+        if not (nadir_angle - 90 * u.deg) < quantity < (nadir_angle + 90 * u.deg):
+            raise ValueError(
+                f"pointing_angle must be within {nadir_angle.to(u.deg)} +/- 90 deg, got {quantity.to(u.deg)}"
+            )
+
+        self._pointing_angle = quantity
 
     @property
     @enforce_units
@@ -137,68 +177,6 @@ class OrbitalObject(ABC):
         (`astropy.units.Quantity`, read-only).
         """
         return self.area / self.distance**2
-
-    @property
-    def canonical_magnitude(self) -> float:
-        """The standardized AB magnitude at the canonical reference geometry
-        (`float`, read-only).
-
-        The canonical geometry is `CANONICAL_RANGE` observed face-on. This
-        value is invariant under changes to the object's orbital geometry.
-        """
-        return self._canonical_magnitude
-
-    @property
-    def observed_magnitude(self) -> float:
-        """The AB magnitude at the object's *current* geometry (`float`,
-        read-only).
-
-        Re-derived from `canonical_magnitude` for the present
-        `height`/`zenith_angle`/`pointing_angle`.
-        """
-        return self._canonical_to_observed(self._canonical_magnitude)
-
-    def _observed_to_canonical(self, magnitude: float) -> float:
-        """Convert an observed AB magnitude to the canonical-geometry magnitude.
-
-        The conversion is a flux ratio and therefore purely geometric (and
-        band-independent): reflected flux scales as ``mu / distance**2``
-        (projection foreshortening times inverse-square range), so
-        ``m_canonical = m_observed + 2.5 * log10(mu) - 5 * log10(d / d_can)``.
-
-        Parameters
-        ----------
-        magnitude : `float`
-            The observed AB magnitude at the current geometry.
-
-        Returns
-        -------
-        canonical_magnitude : `float`
-            The AB magnitude at the canonical reference geometry.
-        """
-        mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
-        distance_ratio = (self.distance / CANONICAL_RANGE).to_value(u.dimensionless_unscaled)
-        return magnitude + 2.5 * np.log10(mu) - 5.0 * np.log10(distance_ratio)
-
-    def _canonical_to_observed(self, magnitude: float) -> float:
-        """Convert a canonical-geometry AB magnitude to the observed magnitude.
-
-        The inverse of `_observed_to_canonical` for the current geometry:
-        ``m_observed = m_canonical - 2.5 * log10(mu) + 5 * log10(d / d_can)``.
-
-        Parameters
-        ----------
-        magnitude : `float`
-            The AB magnitude at the canonical reference geometry.
-
-        Returns
-        -------
-        observed_magnitude : `float`
-            The observed AB magnitude at the current geometry.
-        """
-        mu = np.cos(self.nadir_angle - self.pointing_angle).to_value(u.dimensionless_unscaled)
-        distance_ratio = (self.distance / CANONICAL_RANGE).to_value(u.dimensionless_unscaled)
-        return magnitude - 2.5 * np.log10(mu) + 5.0 * np.log10(distance_ratio)
 
     @property
     @abstractmethod
@@ -278,7 +256,7 @@ class OrbitalObject(ABC):
         self,
         throughput: ThroughputCurve,
         photo_params: PhotometricParameters,
-        brightness_spec: float | int | Sed | None = None,
+        brightness_spec: float | int | Sed,
     ) -> Adu[Scalar]:
         """Calculate the total ADU flux the object's profile should carry.
 
@@ -293,9 +271,8 @@ class OrbitalObject(ABC):
             The bandpass through which the object is observed.
         photo_params : `metroid.photometry.PhotometricParameters`
             The photometric parameters of the observation.
-        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
-            The brightness specification: an AB magnitude or an object SED. If
-            `None` (the default), the object's `observed_magnitude` is used.
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
+            The brightness specification: an AB magnitude or an object SED.
 
         Returns
         -------
@@ -312,9 +289,6 @@ class OrbitalObject(ABC):
 
         if not isinstance(photo_params, PhotometricParameters):
             raise TypeError("photo_params must be 'metroid.photometry.PhotometricParameters'")
-
-        if brightness_spec is None:
-            brightness_spec = self.observed_magnitude
 
         return throughput.calculate_adu(brightness_spec, photo_params)
 
@@ -353,7 +327,7 @@ class OrbitalObject(ABC):
         photo_params: PhotometricParameters,
         psf: galsim.GSObject,
         telescope_pupil: Pupil,
-        brightness_spec: float | int | Sed | None = None,
+        brightness_spec: float | int | Sed = 5.0,
     ) -> galsim.GSObject:
         """Get the tracked profile scaled to its absolute ADU flux.
 
@@ -375,7 +349,7 @@ class OrbitalObject(ABC):
             The surface brightness profile of a point-spread function.
         telescope_pupil : `metroid.Pupil`
             The pupil of the observing telescope.
-        brightness_spec : `float`, `int`, `metroid.photometry.Sed`, or `None`
+        brightness_spec : `float`, `int`, or `metroid.photometry.Sed`
             The brightness specification (see `calculate_flux`).
 
         Returns
@@ -551,7 +525,7 @@ class CompositeOrbitalObject(OrbitalObject):
         self,
         height: OrbitalDistance[Scalar],
         zenith_angle: Angle[Scalar],
-        components: Sequence[Component],
+        components: Sequence[Surface],
         rotation_angle: Angle[Scalar] = 0.0 * u.deg,
         pointing_angle: Angle[Scalar] = 0.0 * u.deg,
         *,
@@ -572,13 +546,13 @@ class CompositeOrbitalObject(OrbitalObject):
             raise ValueError("components must be non-empty")
 
         for component in components:
-            if not isinstance(component, Component):
-                raise TypeError("must be 'metroid.profiles.Component'")
+            if not isinstance(component, Surface):
+                raise TypeError("must be 'metroid.profiles.Surface'")
 
         self._components = components
 
     @property
-    def components(self) -> tuple[Component, ...]:
+    def components(self) -> tuple[Surface, ...]:
         """The parts making up the composite object
         (`tuple` [`metroid.profiles.Component`, ...], read-only).
         """

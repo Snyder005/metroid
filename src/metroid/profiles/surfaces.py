@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
 
 from ..utils.decorators import enforce_units
-from ..utils.quantities import Area, GeometryLength, OrbitalDistance, Reflectivity, Scalar
+from ..utils.quantities import Area, Array, GeometryLength, OrbitalDistance, Reflectivity, Scalar, SolidAngle
 
 
 class Surface(ABC):
@@ -153,8 +153,8 @@ class CircularSurface(Surface):
     def __init__(
         self,
         radius: GeometryLength[Scalar],
-        centroid: GeometryLength[Array] = np.ndarray([0.0, 0.0, 0.0]) * u.m,
-        orientation: Rotation = Rotation.identity()
+        centroid: GeometryLength[Array] = np.array([0.0, 0.0, 0.0]) * u.m,
+        orientation: Rotation = Rotation.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
         super().__init__(centroid, orientation, reflectivity)
@@ -189,7 +189,7 @@ class RectangularSurface(Surface):
         self,
         width: GeometryLength[Scalar],
         length: GeometryLength[Scalar],
-        centroid: GeometryLength[Array] = np.ndarray([0.0, 0.0, 0.0]) * u.m,
+        centroid: GeometryLength[Array] = np.array([0.0, 0.0, 0.0]) * u.m,
         orientation: Rotation = Rotation.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
