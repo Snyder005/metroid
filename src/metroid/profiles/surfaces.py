@@ -18,12 +18,8 @@ class Surface(ABC):
     @enforce_units
     def __init__(
         self,
-        centroid: GeometryLength[Array] = np.array([0., 0., 0.]) * u.m,
-        orientation: Rotation = Rotation.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
-        self._centroid = centroid
-        self._orientation = orientation
         self._reflectivity = reflectivity
  
     @property
@@ -37,52 +33,6 @@ class Surface(ABC):
 
     @property
     @enforce_units
-    def centroid(self) -> GeometryLength[Array]:
-        """The body-frame centroid of the surface, in meters
-        (`astropy.units.Quantity`, read-only).
-        """
-        return self._centroid
-
-    @property
-    @enforce_units
-    def x0(self) -> GeometryLength[Scalar]:
-        """The body-frame x offset of the surface centroid, in meters
-        (`astropy.units.Quantity`, read-only).
-        """
-        return self._centroid[0]
-
-    @property
-    @enforce_units
-    def y0(self) -> GeometryLength[Scalar]:
-        """The body-frame y offset of the surface centroid, in meters
-        (`astropy.units.Quantity`, read-only).
-        """
-        return self._centroid[1]
-
-    @property
-    @enforce_units
-    def z0(self) -> GeometryLength[Scalar]:
-        """The body-frame z offset of the surface centroid, in meters
-        (`astropy.units.Quantity`, read-only).
-        """
-        return self._centroid[2]
-
-    @property
-    def orientation(self) -> Rotation:
-        """The orientation of the surface in the laboratory frame,
-        (`scipy.spatial.transform.Rotation`, read-only).
-        """
-        return self._orientation
-
-    @property
-    def normal(self) -> NDArray:
-        """The body-frame normal vector of the surface (`numpy.ndarray`,
-        read-only).
-        """
-        return self._orientation.apply([0.0, 0.0, 1.0])
-
-    @property
-    @enforce_units
     def reflectivity(self) -> Reflectivity[Scalar]:
         """The reflectivity of the surface, a dimensionless fraction in
         ``[0, 1]`` (`astropy.units.Quantity`, read-only).
@@ -90,7 +40,7 @@ class Surface(ABC):
         return self._reflectivity
 
     @enforce_units
-    def get_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.GSObject:
+    def get_bodyframe_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.GSObject:
         """Get the unprojected body-frame surface brightness profile.
 
         Parameters
