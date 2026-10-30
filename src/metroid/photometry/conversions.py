@@ -1,6 +1,6 @@
 from .photo_params import PhotometricParameters
-from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Adu, EnergyFlux, PhotonFlux, Radiance, SolidAngle
+from ..utils.decorators import enforce_units
+from ..typing.aliases import Adu, EnergyFlux, PhotonFlux, Radiance, SolidAngle
 
 
 @enforce_units

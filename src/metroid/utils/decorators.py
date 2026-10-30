@@ -4,8 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, get_type_hints
 
-from .quantities import _extract_spec, check_quantity
-
+from ..typing.aliases import _extract_spec
+from ..utils.validation import check_quantity
 
 def enforce_units[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     """Enforce input and output parameter units of a callback function.

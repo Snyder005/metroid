@@ -25,8 +25,10 @@ class Surface(ABC):
     @enforce_units
     def __init__(
         self,
+        orientation: Transform = Transform.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
+        self._orientation = orientation
         self._reflectivity = reflectivity
  
     @property
@@ -39,6 +41,18 @@ class Surface(ABC):
         ...
 
     @property
+    def orientation(self) -> Transform:
+        """The surface orientation in the body-frame."""
+        return self._orientation
+
+    @orientation.setter
+    def orientation(self, transform: Transform) -> None:
+        if not isinstance(transform, Transform):
+            raise TypeError("must be a 'metroid.geom.Transform'")
+
+        self._orientation = transform
+
+    @property
     @enforce_units
     def reflectivity(self) -> Reflectivity[Scalar]:
         """The reflectivity of the surface, a dimensionless fraction in
@@ -46,11 +60,11 @@ class Surface(ABC):
         """
         return self._reflectivity
 
+    @abstractmethod
     @enforce_units
-    def get_profile(
+    def _profile(
         self,
         distance: OrbitalDistance[Scalar],
-        transform: Transform | None = None,
     ) -> galsim.GSObject:
         """Get the surface brightness profile of the surface.
 
@@ -58,8 +72,6 @@ class Surface(ABC):
         ----------
         distance : `astropy.units.Quantity`
             The distance from the observer to surface, in kilometers.
-        transform : `metroid.geom.Transform`, optional
-            Coordinate transform to apply to the surface (None, by default).
 
         Returns
         -------
@@ -71,23 +83,9 @@ class Surface(ABC):
         ValueError
             Raised if the affine transform is singular or ill-conditioned.
         """
-        profile = self._shape_profile(distance)
+        ...
 
-        if transform:
-            jac = transform.rotation.as_matrix()[:2, :2]
-            if abs(np.linalg.det(jac)) < 1e-12:
-                raise ValueError("The projected surface is edge-on or nearly edge-on.")
 
-            profile = profile.transform(jac[0, 0], jac[0, 1], jac[1, 0], jac[1, 1])
-
-            translation = (transform.translation / distance).to_value(
-                u.arcsec,
-                equivalencies=u.dimensionless_angles(),
-            )
-            profile.shift(translation[0], translation[1])
-
-        return profile
-    
     @enforce_units
     def get_solid_angle(self, distance: OrbitalDistance[Scalar]) -> SolidAngle[Scalar]:
         """The solid angle of the surface, in steradians
@@ -95,21 +93,45 @@ class Surface(ABC):
         """
         return self.area / distance**2
 
-    @abstractmethod
-    def _shape_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.GSObject:
+    @enforce_units
+    def get_profile(
+        self,
+        distance: OrbitalDistance[Scalar],
+        other_transform: Transform | None = None,
+    ) -> galsim.GSObject:
         """The original surface brightness profile at ``distance``.
 
         Parameters
         ----------
         distance : `astropy.units.Quantity`
             The distance from the observer to the surface, in kilometers.
+        other_transform : `metroid.geom.Transform`, optional
+            Additional transform to apply (None, by default).
 
         Returns
         -------
         profile : `galsim.GSObject`
             The surface brightness profile, before rotation and translation.
         """
-        ...
+        profile = self._profile(distance)
+
+        if other_transform:
+            transform = other_transform @ self.orientation
+        else:
+            transform = self.orientation
+
+        jac = transform.rotation.as_matrix()[:2, :2]
+        if abs(np.linalg.det(jac)) < 1e-12:
+            raise ValueError("The projected surface is edge-on or nearly edge-on.")
+
+        profile = profile.transform(jac[0, 0], jac[0, 1], jac[1, 0], jac[1, 1])
+        translation = (transform.translation / distance).to_value(
+            u.arcsec,
+            equivalencies=u.dimensionless_angles(),
+        )
+        profile = profile.shift(translation[0], translation[1])
+
+        return profile
 
 
 class CircularSurface(Surface):
@@ -119,9 +141,10 @@ class CircularSurface(Surface):
     def __init__(
         self,
         radius: GeometryLength[Scalar],
+        orientation: Transform = Transform.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
-        super().__init__(reflectivity)
+        super().__init__(orientation, reflectivity)
         self._radius = radius
 
     @property
@@ -140,7 +163,8 @@ class CircularSurface(Surface):
         """
         return np.pi * self.radius**2.0
 
-    def _shape_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.TopHat:
+    @enforce_units
+    def _profile(self, distance: OrbitalDistance[Scalar]) -> galsim.TopHat:
         """The original surface brightness profile at ``distance``.
 
         Parameters
@@ -165,9 +189,10 @@ class RectangularSurface(Surface):
         self,
         length: GeometryLength[Scalar],
         width: GeometryLength[Scalar],
+        orientation: Transform = Transform.identity(),
         reflectivity: Reflectivity[Scalar] = 1.0 * u.dimensionless_unscaled,
     ):
-        super().__init__(reflectivity)
+        super().__init__(orientation, reflectivity)
         self._length = length
         self._width = width
 
@@ -195,7 +220,8 @@ class RectangularSurface(Surface):
         """
         return self.width * self.length
 
-    def _shape_profile(self, distance: OrbitalDistance[Scalar]) -> galsim.Box:
+    @enforce_units
+    def _profile(self, distance: OrbitalDistance[Scalar]) -> galsim.Box:
         """The original surface brightness profile at ``distance``.
 
         Parameters
