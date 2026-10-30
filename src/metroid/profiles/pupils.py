@@ -10,7 +10,7 @@ import numpy as np
 from ..utils.config import Registrable
 from ..utils.validation import get_field_value
 from ..utils.decorators import enforce_units
-from ..utils.quantities import Area, GeometryLength, OrbitalDistance, Scalar
+from ..typing.aliases import Area, GeometryLength, OrbitalDistance, Scalar
 
 
 class Pupil(Registrable, ABC, registry_label="pupil"):

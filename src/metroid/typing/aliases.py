@@ -1,16 +1,3 @@
-"""Physical quantity specifications and runtime validation.
-
-A `QuantitySpec` reduces a physical quantity to its essential
-identity - a name, a canonical unit, and allowed equivalencies - plus
-an ordered list of pluggable `Constraint` objects. Validation converts
-to canonical units once and then runs every value-level constraint,
-aggregating all failures into a single `QuantityValidationError`.
-
-New kinds of value-level check are added by writing a small constraint
-class; the core `check_quantity` validator never changes. The fluent
-`Spec` builder keeps the catalogue declarations terse.
-"""
-
 import types
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Protocol, TypeAliasType, Union, get_args, get_origin, runtime_checkable
@@ -210,57 +197,6 @@ class Spec:
     def build(self) -> QuantitySpec:
         """Return the assembled, immutable specification."""
         return self._spec
-
-
-def check_quantity(quantity: u.Quantity, spec: QuantitySpec, shape: ShapeKind = ANY_SHAPE) -> u.Quantity:
-    """Check that quantity has valid units, value, and shape.
-
-    The unit is converted to the spec's canonical unit, then every
-    value-level constraint and the shape restriction are run and all
-    failures are aggregated into a single `QuantityValidationError`.
-
-    Parameters
-    ----------
-    quantity : `astropy.units.Quantity`
-        The quantity to check.
-    spec : `metroid.utils.quantities.QuantitySpec`
-        The quantity specification.
-    shape : `metroid.utils.quantities.ShapeKind`, optional
-        The shape restriction (``SCALAR``, ``ARRAY``, or ``ANY_SHAPE``).
-        Defaults to ``ANY_SHAPE`` (scalar or array both allowed).
-
-    Returns
-    -------
-    quantity : `astropy.units.Quantity`
-        The quantity in the specified default units.
-
-    Raises
-    ------
-    TypeError
-        Raised if ``quantity`` or ``spec`` are invalid types.
-    QuantityValidationError
-        Raised if ``quantity`` fails one or more value-level or shape checks.
-    ValueError
-        Raised if the unit is not convertible to the canonical unit.
-    """
-    if not isinstance(spec, QuantitySpec):
-        raise TypeError(f"{spec} must be 'metroid.utils.quantities.QuantitySpec'")
-
-    if not isinstance(quantity, u.Quantity):
-        raise TypeError(f"{spec.name} must be 'astropy.units.Quantity'")
-
-    if not quantity.unit.is_equivalent(spec.default, equivalencies=spec.equivalencies):
-        raise ValueError(f"invalid unit for {spec.name}: {quantity.unit}")
-
-    quantity = quantity.to(spec.default, equivalencies=spec.equivalencies)
-
-    problems = [msg for c in spec.constraints if (msg := c.check(quantity, spec.name)) is not None]
-    if (msg := shape.check(quantity, spec.name)) is not None:
-        problems.append(msg)
-    if problems:
-        raise QuantityValidationError(spec.name, problems)
-
-    return quantity
 
 
 def _spec_from_annotated(annotation: Any) -> QuantitySpec | None:

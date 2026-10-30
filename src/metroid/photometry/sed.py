@@ -4,8 +4,8 @@ from astropy import units as u
 from astropy.constants import c
 import numpy as np
 
-from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Array, Wavelength, SpectralFluxDensity
+from ..utils.decorators import enforce_units
+from ..typing.aliases import Array, Wavelength, SpectralFluxDensity
 
 
 class Sed:

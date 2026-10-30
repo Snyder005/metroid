@@ -9,8 +9,8 @@ from speclite.filters import FilterResponse, load_filter
 from .conversions import photon_flux_to_adu
 from .photo_params import PhotometricParameters
 from .sed import Sed
-from metroid.utils.decorators import enforce_units
-from metroid.utils.quantities import Adu, Array, EnergyFlux, PhotonFlux, Fraction, Scalar, Wavelength
+from ..utils.decorators import enforce_units
+from ..typing.aliases import Adu, Array, EnergyFlux, PhotonFlux, Fraction, Scalar, Wavelength
 
 
 @functools.lru_cache(maxsize=1)

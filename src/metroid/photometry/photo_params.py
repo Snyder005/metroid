@@ -1,7 +1,7 @@
 import astropy.units as u
 
 from metroid.utils.decorators import validated_dataclass
-from metroid.utils.quantities import Area, Gain, QuantumEfficiency, Scalar, Time
+from ..typing.aliases import Area, Gain, QuantumEfficiency, Scalar, Time
 
 
 @validated_dataclass(frozen=True)
