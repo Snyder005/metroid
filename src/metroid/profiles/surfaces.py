@@ -30,7 +30,7 @@ class Surface(ABC):
     ):
         self._orientation = orientation
         self._reflectivity = reflectivity
- 
+
     @property
     @abstractmethod
     @enforce_units
@@ -234,6 +234,6 @@ class RectangularSurface(Surface):
         profile : `galsim.GSObject`
             The surface brightness profile, before rotation and translation.
         """
-        w = (self.width / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
         l = (self.length / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
-        return galsim.Box(w, l)
+        w = (self.width / distance).to_value(u.arcsec, equivalencies=u.dimensionless_angles())
+        return galsim.Box(l, w)

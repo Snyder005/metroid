@@ -18,7 +18,6 @@ class OrbitalObject:
     def __init__(
         self,
         components: Sequence[Surface],
-        height: OrbitalDistance[Scalar],
         attitude: Transform = Transform.identity(),
     ):
         components = tuple(components)
@@ -30,7 +29,6 @@ class OrbitalObject:
                 raise TypeError("must be 'metroid.profiles.Surface'")
 
         self._components = components
-        self._height = height
         self._attitude = attitude
 
     @property
@@ -47,11 +45,6 @@ class OrbitalObject:
         (`astropy.units.Quantity`).
         """
         return self._height
-
-    @height.setter
-    @enforce_units
-    def height(self, quantity: OrbitalDistance[Scalar]) -> None:
-        self._height = quantity
 
     @property
     def attitude(self) -> Transform:
